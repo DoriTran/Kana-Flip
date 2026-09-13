@@ -31,4 +31,4 @@ export const useKanaStore=create<KanaState>()(persist((set,get)=>({
   pauseTimer:()=>set(s=>{const a=s.activeSession;if(!a||a.timerStartedAt==null||a.timerRemainingMs==null)return{};return{activeSession:{...a,timerRemainingMs:Math.max(0,a.timerRemainingMs-(Date.now()-a.timerStartedAt)),timerStartedAt:null}}}),
   resumeTimer:()=>set(s=>{const a=s.activeSession;if(!a||a.timerRemainingMs==null||a.completed)return{};return{activeSession:{...a,timerStartedAt:Date.now()}}}),
   clearAll:()=>set({preferences:defaults,kanaProgress:{},sessions:[],activeSession:null}),
-}),{name:'kana-flip-store',version:2,migrate:p=>{const state=p as KanaState;return{...state,preferences:{...defaults,...state.preferences}}},partialize:s=>({preferences:s.preferences,kanaProgress:s.kanaProgress,sessions:s.sessions,activeSession:s.activeSession})}))
+}),{name:'kanaflip:v1',version:2,migrate:p=>{const state=p as KanaState;return{...state,preferences:{...defaults,...state.preferences}}},partialize:s=>({preferences:s.preferences,kanaProgress:s.kanaProgress,sessions:s.sessions,activeSession:s.activeSession})}))
