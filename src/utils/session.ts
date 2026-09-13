@@ -4,7 +4,8 @@ import type { ActiveStudySession, StudyPreferences, StudySession, StudySource } 
 export const shuffle = <T,>(items: T[]) => { const copy=[...items]; for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]]} return copy }
 export const createActiveSession = (ids: string[], preferences: StudyPreferences, source: StudySource, type: 'study'|'review'): ActiveStudySession => {
   const deck = (preferences.shuffled ? shuffle(ids) : ids).map(kanaId=>({kanaId,graded:false,grade:null,recognitionMs:null}))
-  return { id: crypto.randomUUID(), type, source, startedAt: Date.now(), deck, currentIndex: 0, flipped: false, reviewQueue: [], reviewIndex: 0, reviewPhase: false, reviewTimings: {}, timerRemainingMs: preferences.timerMs, timerStartedAt: preferences.timerMs ? Date.now() : null, completed: false }
+  const waitingToStart = preferences.readyFirstCard
+  return { id: crypto.randomUUID(), type, source, startedAt: Date.now(), deck, currentIndex: 0, flipped: false, reviewQueue: [], reviewIndex: 0, reviewPhase: false, reviewTimings: {}, timerRemainingMs: preferences.timerMs, timerStartedAt: preferences.timerMs && !waitingToStart ? Date.now() : null, recordSession: preferences.recordSession, waitingToStart, completed: false }
 }
 export const archiveSession = (active: ActiveStudySession, reviewAtEnd: boolean, timerMs: number|null): StudySession => {
   const map = new Map<string,{correctCount:number;wrongCount:number;recognitionTimes:number[]}>()

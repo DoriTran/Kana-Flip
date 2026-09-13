@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, BookOpenCheck, Check, HelpCircle, House, RotateCcw, Star, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookOpenCheck, Check, HelpCircle, House, RotateCcw, Sparkles, Star, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { kanaById } from '../data/kana'
@@ -45,6 +45,7 @@ export function LearningPage() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTextControl(event.target) || help) return
+      if (store.activeSession?.waitingToStart) { event.preventDefault(); store.beginSession(); resetClock(); return }
       const code = event.code
       if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyW', 'KeyS', 'Enter'].includes(code)) event.preventDefault()
       if (code === 'Space') store.flip()
@@ -56,10 +57,11 @@ export function LearningPage() {
     }
     window.addEventListener('keydown', onKeyDown, { capture: true })
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true })
-  }, [store, cardId, help, grade])
+  }, [store, cardId, help, grade, resetClock])
 
   if (!active || !cardId) return <Navigate to="/" replace />
   if (active.completed) return <ResultView />
+  if (active.waitingToStart) return <div className={`learn-page ${store.preferences.reducedMotion ? 'reduced-motion' : ''}`}><header className="learn-top"><button onClick={() => nav('/')}><ArrowLeft /> Exit</button><span><b>Get ready</b><small>{active.source.replace('-', ' ')}</small></span><div /></header><main className="ready-stage"><button className="ready-card" onClick={() => { store.beginSession(); resetClock() }}><Sparkles /><strong>Ready?</strong><span>Press any key or tap to begin</span></button></main></div>
   const kana = kanaById[cardId]
   const graded = active.deck.filter(item => item.graded)
   const correct = graded.filter(item => item.grade === 'correct').length

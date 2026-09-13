@@ -1,5 +1,5 @@
 import { ArrowLeft, Check, Clock3, Flower, X } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { kanaById } from '../data/kana'
@@ -13,11 +13,11 @@ export function LessonReviewPage() {
   const storedSession = useKanaStore(state => state.sessions.find(item => item.id === sessionId))
   const activeSession = useKanaStore(state => state.activeSession)
   const archiveActive = useKanaStore(state => state.archiveActive)
-  const activeSnapshot = useMemo(() => {
+  const [activeSnapshot] = useState(() => {
     if (!activeSession || activeSession.id !== sessionId || !activeSession.completed) return null
     const preferences = useKanaStore.getState().preferences
     return archiveSession(activeSession, preferences.reviewMistakesAtEnd, preferences.timerMs)
-  }, [activeSession, sessionId])
+  })
   const session = storedSession ?? activeSnapshot
   useEffect(() => {
     if (!storedSession && activeSnapshot) archiveActive()
