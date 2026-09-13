@@ -1,0 +1,34 @@
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+import { allKana } from '../data/kana'
+import type { ActiveStudySession, KanaProgress, StudyPreferences, StudySession, StudySource } from '../types/kana'
+import { archiveSession, createActiveSession, sourceIds } from '../utils/session'
+import { recentWrongCount } from '../utils/stats'
+
+const defaults: StudyPreferences = { characterSet:'hiragana', reviewMode:'none', reviewMistakesAtEnd:true, shuffled:true, lockNavigation:false, timerMs:null, showKeyboardHints:true, reducedMotion:false }
+interface KanaState { preferences:StudyPreferences; kanaProgress:Record<string,KanaProgress>; sessions:StudySession[]; activeSession:ActiveStudySession|null; setPreferences:(patch:Partial<StudyPreferences>)=>void; startSession:(sourceOverride?:StudySource, idsOverride?:string[])=>boolean; discardSession:()=>void; toggleStar:(id:string)=>void; flip:()=>void; navigate:(delta:number)=>void; grade:(grade:'correct'|'wrong',elapsedMs:number)=>void; addReviewTime:(kanaId:string,elapsedMs:number)=>void; archiveActive:()=>StudySession|null; reviewActiveMistakes:()=>boolean; pauseTimer:()=>void; resumeTimer:()=>void; clearAll:()=>void }
+const progressFor=(id:string):KanaProgress=>({kanaId:id,starred:false,bestRecognitionMs:null,totalCorrect:0,totalWrong:0,lastStudiedAt:null})
+
+export const useKanaStore=create<KanaState>()(persist((set,get)=>({
+  preferences:defaults,kanaProgress:{},sessions:[],activeSession:null,
+  setPreferences:patch=>set(s=>({preferences:{...s.preferences,...patch}})),
+  startSession:(sourceOverride,idsOverride)=>{const s=get(),p=s.preferences; let source:StudySource=sourceOverride??(p.reviewMode==='none'?p.characterSet:p.reviewMode); let ids=idsOverride; if(!ids){ids=p.reviewMode==='starred'?allKana.filter(k=>s.kanaProgress[k.id]?.starred).map(k=>k.id):p.reviewMode==='recent-mistakes'?allKana.filter(k=>recentWrongCount(s.sessions,k.id)>0).map(k=>k.id):sourceIds(p.characterSet)} if(!ids.length)return false; set({activeSession:createActiveSession(ids,p,source,p.reviewMode==='none'&&!sourceOverride?'study':'review')}); return true},
+  discardSession:()=>set({activeSession:null}),toggleStar:id=>set(s=>({kanaProgress:{...s.kanaProgress,[id]:{...(s.kanaProgress[id]??progressFor(id)),starred:!(s.kanaProgress[id]?.starred??false)}}})),
+  flip:()=>set(s=>s.activeSession&&!s.activeSession.completed?{activeSession:{...s.activeSession,flipped:!s.activeSession.flipped}}:{}),
+  navigate:delta=>set(s=>{
+    const active=s.activeSession
+    if(!active||active.reviewPhase||active.completed||s.preferences.timerMs!=null)return{}
+    const next=Math.max(0,Math.min(active.deck.length-1,active.currentIndex+delta))
+    if(next===active.currentIndex)return{}
+    const target=active.deck[next]
+    const timerRemainingMs=s.preferences.timerMs==null?null:target.graded?Math.max(0,s.preferences.timerMs-(target.recognitionMs??0)):s.preferences.timerMs
+    return{activeSession:{...active,currentIndex:next,flipped:false,timerRemainingMs,timerStartedAt:s.preferences.timerMs!=null&&!target.graded?Date.now():null}}
+  }),
+  grade:(grade,elapsedMs)=>set(s=>{const a=s.activeSession;if(!a||a.completed)return{}; if(a.reviewPhase){const id=a.reviewQueue[a.reviewIndex];const reviewTimings={...a.reviewTimings,[id]:(a.reviewTimings[id]??0)+elapsedMs};const reviewIndex=a.reviewIndex+1;return{activeSession:{...a,reviewTimings,reviewIndex,flipped:false,completed:reviewIndex>=a.reviewQueue.length,timerRemainingMs:s.preferences.timerMs,timerStartedAt:s.preferences.timerMs?Date.now():null}}} const entry=a.deck[a.currentIndex];if(entry.graded)return{};const deck=[...a.deck];deck[a.currentIndex]={...entry,graded:true,grade,recognitionMs:elapsedMs};const reviewQueue=grade==='wrong'&&s.preferences.reviewMistakesAtEnd?[...a.reviewQueue,entry.kanaId]:a.reviewQueue;const allGraded=deck.every(e=>e.graded);let next=allGraded?a.currentIndex:deck.findIndex((e,i)=>i>a.currentIndex&&!e.graded);if(next<0&&!allGraded)next=deck.findIndex(e=>!e.graded);const reviewPhase=allGraded&&reviewQueue.length>0;const completed=allGraded&&!reviewPhase;const progress={...s.kanaProgress};if(a.type==='study'){const old=progress[entry.kanaId]??progressFor(entry.kanaId);progress[entry.kanaId]={...old,totalCorrect:old.totalCorrect+(grade==='correct'?1:0),totalWrong:old.totalWrong+(grade==='wrong'?1:0),lastStudiedAt:Date.now(),bestRecognitionMs:old.bestRecognitionMs==null||elapsedMs<old.bestRecognitionMs?elapsedMs:old.bestRecognitionMs}}return{kanaProgress:progress,activeSession:{...a,deck,reviewQueue,reviewPhase,completed,currentIndex:next,reviewIndex:0,flipped:false,timerRemainingMs:s.preferences.timerMs,timerStartedAt:s.preferences.timerMs?Date.now():null}}}),
+  addReviewTime:(id,ms)=>set(s=>s.activeSession?{activeSession:{...s.activeSession,reviewTimings:{...s.activeSession.reviewTimings,[id]:(s.activeSession.reviewTimings[id]??0)+ms}}}:{}),
+  archiveActive:()=>{const s=get();if(!s.activeSession||!s.activeSession.completed)return null;const archived=archiveSession(s.activeSession,s.preferences.reviewMistakesAtEnd,s.preferences.timerMs);set({sessions:[archived,...s.sessions],activeSession:null});return archived},
+  reviewActiveMistakes:()=>{const s=get(),a=s.activeSession;if(!a||!a.completed)return false;const ids=[...new Set(a.deck.filter(e=>e.grade==='wrong').map(e=>e.kanaId))];if(!ids.length)return false;const archived=archiveSession(a,s.preferences.reviewMistakesAtEnd,s.preferences.timerMs);set({sessions:[archived,...s.sessions],activeSession:createActiveSession(ids,{...s.preferences,reviewMode:'none'},'session-mistakes','review')});return true},
+  pauseTimer:()=>set(s=>{const a=s.activeSession;if(!a||a.timerStartedAt==null||a.timerRemainingMs==null)return{};return{activeSession:{...a,timerRemainingMs:Math.max(0,a.timerRemainingMs-(Date.now()-a.timerStartedAt)),timerStartedAt:null}}}),
+  resumeTimer:()=>set(s=>{const a=s.activeSession;if(!a||a.timerRemainingMs==null||a.completed)return{};return{activeSession:{...a,timerStartedAt:Date.now()}}}),
+  clearAll:()=>set({preferences:defaults,kanaProgress:{},sessions:[],activeSession:null}),
+}),{name:'kana-flip-store',version:2,migrate:p=>{const state=p as KanaState;return{...state,preferences:{...defaults,...state.preferences}}},partialize:s=>({preferences:s.preferences,kanaProgress:s.kanaProgress,sessions:s.sessions,activeSession:s.activeSession})}))
