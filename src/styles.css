@@ -528,3 +528,35 @@ button.setup-toggle-card:hover {
     padding: 20px 0;
   }
 }
+.review-page-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.review-sort-button {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: #9b4053;
+  border-radius: 9px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.review-sort-button:hover {
+  border-color: #dfa0ad;
+  background: var(--blush-pale);
+}
+.review-sort-button svg {
+  width: 16px;
+  height: 16px;
+}
+@media (max-width: 520px) {
+  .review-page-toolbar {
+    align-items: stretch;
+  }
+  .review-sort-button {
+    font-size: 12px;
+  }
+}

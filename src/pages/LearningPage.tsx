@@ -59,8 +59,9 @@ export function LearningPage() {
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true })
   }, [store, cardId, help, grade, resetClock])
 
-  if (!active || !cardId) return <Navigate to="/" replace />
+  if (!active) return <Navigate to="/" replace />
   if (active.completed) return <ResultView />
+  if (!cardId) return <Navigate to="/" replace />
   if (active.waitingToStart) return <div className={`learn-page ${store.preferences.reducedMotion ? 'reduced-motion' : ''}`}><header className="learn-top"><button onClick={() => nav('/')}><ArrowLeft /> Exit</button><span><b>Get ready</b><small>{active.source.replace('-', ' ')}</small></span><div /></header><main className="ready-stage"><button className="ready-card" onClick={() => { store.beginSession(); resetClock() }}><Sparkles /><strong>Ready?</strong><span>Press any key or tap to begin</span></button></main></div>
   const kana = kanaById[cardId]
   const graded = active.deck.filter(item => item.graded)
