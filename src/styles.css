@@ -422,3 +422,7 @@ button.setup-toggle-card:hover {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+.flip-scene:focus {
+  outline: none;
+}
