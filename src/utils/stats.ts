@@ -2,6 +2,18 @@ import type { Kana, StudySession } from '../types/kana'
 
 export const latestStudies = (sessions: StudySession[]) => sessions.filter(s => s.type === 'study').sort((a,b) => b.finishedAt-a.finishedAt).slice(0,10)
 export const recentWrongCount = (sessions: StudySession[], kanaId: string) => latestStudies(sessions).reduce((sum,s) => sum + (s.results.find(r => r.kanaId === kanaId)?.wrongCount ?? 0), 0)
+export const averageStudyRecognitionTimes = (sessions: StudySession[]) => {
+  const timings = new Map<string, number[]>()
+  sessions.filter(session => session.type === 'study').forEach(session => session.results.forEach(result => {
+    if (!result.recognitionTimes.length) return
+    timings.set(result.kanaId, [...(timings.get(result.kanaId) ?? []), ...result.recognitionTimes])
+  }))
+  return [...timings].map(([kanaId, times]) => ({ kanaId, averageMs: times.reduce((sum, ms) => sum + ms, 0) / times.length }))
+}
+export const slowReviewIds = (sessions: StudySession[], mode: 'top-30' | 'over-threshold', thresholdMs: number, topCount = 30) => {
+  const ranked = averageStudyRecognitionTimes(sessions).sort((a, b) => b.averageMs - a.averageMs)
+  return (mode === 'top-30' ? ranked.slice(0, Math.max(1, Math.min(92, topCount))) : ranked.filter(item => item.averageMs > thresholdMs)).map(item => item.kanaId)
+}
 export const sessionSummary = (session: StudySession) => {
   const correct = session.results.reduce((n,r)=>n+r.correctCount,0), wrong = session.results.reduce((n,r)=>n+r.wrongCount,0)
   const times = session.results.flatMap(r=>r.recognitionTimes.map(ms=>({kanaId:r.kanaId,ms})))

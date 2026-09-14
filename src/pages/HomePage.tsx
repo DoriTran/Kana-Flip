@@ -1,14 +1,14 @@
 import {
-  BookOpen, BookOpenCheck, CheckCircle2, ClipboardList, Clock3, EyeOff, Flower,
-  Flower2, Info, LockKeyhole, Play, Rabbit, RotateCcw, Settings2, Shuffle,
+  BookOpen, CheckCircle2, ClipboardList, Clock3, EyeOff, Flower,
+  Flower2, Gauge, Info, LockKeyhole, Play, Rabbit, RotateCcw, Settings2, Shuffle,
   SlidersHorizontal, Sparkles, Star, Trash2,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { SettingsDialog } from '../components/SettingsDialog'
 import { useKanaStore } from '../stores/kanaStore'
-import { formatTime, recentWrongCount, sessionSummary } from '../utils/stats'
+import { recentWrongCount, slowReviewIds } from '../utils/stats'
 
 export function HomePage() {
   const nav = useNavigate()
@@ -16,20 +16,65 @@ export function HomePage() {
   const { preferences: p, setPreferences, activeSession, sessions, kanaProgress } = store
   const [settings, setSettings] = useState(false)
   const [discard, setDiscard] = useState(false)
-  const [deleting, setDeleting] = useState<string | null>(null)
+
+  const [slowThresholdInput, setSlowThresholdInput] = useState(String(p.slowThresholdMs / 1000))
+  const [slowTopInput, setSlowTopInput] = useState(String(p.slowTopCount))
   const starred = Object.values(kanaProgress).filter(kana => kana.starred).length
   const recent = Object.keys(kanaProgress).filter(id => recentWrongCount(sessions, id) > 0).length
+  const slowIds = slowReviewIds(sessions, p.slowReviewMode, p.slowThresholdMs, p.slowTopCount)
   const empty = p.reviewMode === 'starred' && !starred
     ? 'Star a few kana first to study them here.'
-    : p.reviewMode === 'recent-mistakes' && !recent ? 'No recent mistakes — lovely work!' : null
-  const chooseReview = (reviewMode: 'starred' | 'recent-mistakes') => setPreferences({ reviewMode })
+    : p.reviewMode === 'recent-mistakes' && !recent ? 'No recent mistakes — lovely work!'
+      : p.reviewMode === 'slowest' && !slowIds.length
+        ? p.slowReviewMode === 'over-threshold'
+          ? `No cards currently over ${Number((p.slowThresholdMs / 1000).toFixed(2))}s.`
+          : 'No recorded cards available for Top ' + p.slowTopCount + ' yet.'
+        : null
+  const chooseReview = (reviewMode: 'starred' | 'recent-mistakes' | 'slowest') => setPreferences({ reviewMode })
   const chooseCharacterSet = (characterSet: 'hiragana' | 'katakana' | 'both') =>
     setPreferences({ characterSet, reviewMode: 'none' })
+  useEffect(() => {
+    if (activeSession?.completed) useKanaStore.getState().archiveActive()
+  }, [activeSession?.id, activeSession?.completed])
+
   const start = () => { if (store.startSession()) nav('/learn') }
   const toggleTimer = () => setPreferences({ timerMs: p.timerMs == null ? 5000 : null })
   const setTimerSeconds = (value: string) => {
     const seconds = Math.max(1, Math.min(60, Number(value) || 1))
     setPreferences({ timerMs: seconds * 1000 })
+  }
+  const changeSlowTop = (value: string) => {
+    if (!/^\d{0,2}$/.test(value) || Number(value) > 92) return
+    setSlowTopInput(value)
+    const count = Number(value)
+    if (value && count > 0) setPreferences({ reviewMode: 'slowest', slowReviewMode: 'top-30', slowTopCount: count })
+  }
+  const commitSlowTop = () => {
+    const count = Number(slowTopInput)
+    if (!slowTopInput || !Number.isInteger(count) || count < 1 || count > 92) {
+      setSlowTopInput('30')
+      setPreferences({ reviewMode: 'slowest', slowReviewMode: 'top-30', slowTopCount: 30 })
+      return
+    }
+    setSlowTopInput(String(count))
+    setPreferences({ reviewMode: 'slowest', slowReviewMode: 'top-30', slowTopCount: count })
+  }
+  const changeSlowThreshold = (value: string) => {
+    if (!/^\d{0,2}(?:\.\d{0,2})?$/.test(value) || Number(value) > 60) return
+    setSlowThresholdInput(value)
+    const seconds = Number(value)
+    if (value && seconds > 0) setPreferences({ reviewMode: 'slowest', slowReviewMode: 'over-threshold', slowThresholdMs: seconds * 1000 })
+  }
+  const commitSlowThreshold = () => {
+    const seconds = Number(slowThresholdInput)
+    if (!slowThresholdInput || !Number.isFinite(seconds) || seconds <= 0) {
+      setSlowThresholdInput('5')
+      setPreferences({ reviewMode: 'slowest', slowReviewMode: 'over-threshold', slowThresholdMs: 5000 })
+      return
+    }
+    const normalized = Number(seconds.toFixed(2))
+    setSlowThresholdInput(String(normalized))
+    setPreferences({ reviewMode: 'slowest', slowReviewMode: 'over-threshold', slowThresholdMs: normalized * 1000 })
   }
 
   return <Layout onSettings={() => setSettings(true)}><main>
@@ -62,8 +107,52 @@ export function HomePage() {
               {p.reviewMode === 'starred' && <CheckCircle2 className="choice-check" />}<Star /><span><strong>Starred only</strong><small>{starred} available · Practice your starred cards</small></span>
             </button>
             <button className={'study-choice-card review-choice' + (p.reviewMode === 'recent-mistakes' ? ' selected' : '')} onClick={() => chooseReview('recent-mistakes')} aria-pressed={p.reviewMode === 'recent-mistakes'}>
-              {p.reviewMode === 'recent-mistakes' && <CheckCircle2 className="choice-check" />}<ClipboardList /><span><strong>Mistakes from last 10 studies</strong><small>{recent} available · Cards missed recently</small></span>
+              {p.reviewMode === 'recent-mistakes' && <CheckCircle2 className="choice-check" />}<ClipboardList /><span><strong>Last 10 studies</strong><small>{recent} available · Wrong cards recently</small></span>
             </button>
+            <div
+              className={'study-choice-card review-choice slow-review-choice' + (p.reviewMode === 'slowest' ? ' selected' : '')}
+              role="radio"
+              tabIndex={0}
+              aria-checked={p.reviewMode === 'slowest'}
+              onClick={() => chooseReview('slowest')}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  chooseReview('slowest')
+                }
+              }}
+            >
+              {p.reviewMode === 'slowest' && <CheckCircle2 className="choice-check" />}
+              <Gauge />
+              <span><strong>Slowest characters</strong><small>{slowIds.length} available · Hiragana &amp; Katakana combined</small></span>
+              <div className="slow-review-controls" onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
+                <label className={p.slowReviewMode === 'top-30' ? 'active' : ''}>
+                  <span>Top</span>
+                  <input
+                    aria-label="Number of slowest characters"
+                    type="text"
+                    inputMode="numeric"
+                    value={slowTopInput}
+                    onFocus={() => setPreferences({ reviewMode: 'slowest', slowReviewMode: 'top-30' })}
+                    onChange={event => changeSlowTop(event.target.value)}
+                    onBlur={commitSlowTop}
+                  />
+                </label>
+                <label className={p.slowReviewMode === 'over-threshold' ? 'active' : ''}>
+                  <span>Over</span>
+                  <input
+                    aria-label="Slow review threshold in seconds"
+                    type="text"
+                    inputMode="decimal"
+                    value={slowThresholdInput}
+                    onFocus={() => setPreferences({ reviewMode: 'slowest', slowReviewMode: 'over-threshold' })}
+                    onChange={event => changeSlowThreshold(event.target.value)}
+                    onBlur={commitSlowThreshold}
+                  />
+                  <span>s</span>
+                </label>
+              </div>
+            </div>
           </div>
           <p className="setup-info"><Info /> Review sessions don’t affect your main study statistics.</p>
         </section>
@@ -130,20 +219,8 @@ export function HomePage() {
       <div className="setup-corner-art right" aria-hidden><Flower /><Flower2 /></div>
     </section>
 
-    <section className="paper-card history">
-      <div className="section-heading between"><div><h2>Recent Studies</h2><p>Your gentle learning rhythm</p></div>{sessions.length > 0 && <span>{sessions.filter(session => session.type === 'study').length} study sessions</span>}</div>
-      {sessions.length === 0 ? <div className="empty-history"><Clock3 /><p>Your completed sessions will bloom here.</p></div> : sessions.slice(0, 5).map(session => {
-        const summary = sessionSummary(session)
-        return <article key={session.id} className={session.type === 'review' ? 'review-row' : ''}>
-          <span className="history-kana">{session.source === 'both' ? <Flower aria-label="Both" /> : session.source === 'katakana' ? 'ア' : 'あ'}</span>
-          <div><b>{session.type === 'review' ? 'Review · ' + session.source : session.source[0].toUpperCase() + session.source.slice(1)}</b><small>{new Date(session.finishedAt).toLocaleString()}</small></div>
-          {session.type === 'study' ? <><strong>{summary.correct} / {summary.total}</strong><span>{Math.round(summary.accuracy)}%</span><span>{summary.wrong} mistakes</span><span>{formatTime(summary.averageMs)} avg</span></> : <span className="review-count">{summary.total} cards</span>}
-          <div className="history-actions"><button className="history-review" onClick={() => nav('/review/' + session.id)} aria-label={'Review ' + session.source + ' lesson'}><BookOpenCheck /> Review</button><button className="history-delete" onClick={() => setDeleting(session.id)} aria-label={'Delete ' + session.source + ' record'}><Trash2 /></button></div>
-        </article>
-      })}
-    </section>
   </main>
-  {deleting && <div className="modal-backdrop"><div className="dialog mini" role="alertdialog"><h2>Delete this record?</h2><p>This removes only this completed session from your recent studies.</p><div className="dialog-actions"><button onClick={() => setDeleting(null)}>Keep it</button><button className="danger" onClick={() => { store.deleteSession(deleting); setDeleting(null) }}>Delete</button></div></div></div>}
+
   {settings && <SettingsDialog onClose={() => setSettings(false)} />}
   {discard && <div className="modal-backdrop"><div className="dialog mini" role="alertdialog"><h2>Discard this session?</h2><p>Your answers from this unfinished session will be removed.</p><div className="dialog-actions"><button onClick={() => setDiscard(false)}>Keep it</button><button className="danger" onClick={() => { store.discardSession(); setDiscard(false) }}>Discard</button></div></div></div>}
   </Layout>

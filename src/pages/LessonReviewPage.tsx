@@ -16,7 +16,7 @@ export function LessonReviewPage() {
   const [activeSnapshot] = useState(() => {
     if (!activeSession || activeSession.id !== sessionId || !activeSession.completed) return null
     const preferences = useKanaStore.getState().preferences
-    return archiveSession(activeSession, preferences.reviewMistakesAtEnd, preferences.timerMs)
+    return archiveSession(activeSession)
   })
   const session = storedSession ?? activeSnapshot
   useEffect(() => {
