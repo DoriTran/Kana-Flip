@@ -4,7 +4,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { kanaById } from '../data/kana'
 import { useKanaStore } from '../stores/kanaStore'
-import { archiveSession } from '../utils/session'
+import { archiveSession, sessionAddons } from '../utils/session'
 import { formatTime, sessionSummary } from '../utils/stats'
 
 type SortMode = 'wrong-slowest' | 'correct-fastest'
@@ -29,6 +29,9 @@ export function LessonReviewPage() {
   if (!session) return <Navigate to="/" replace />
 
   const summary = sessionSummary(session)
+  const addons = sessionAddons(session)
+  const sourceName = session.source[0].toUpperCase() + session.source.slice(1)
+  const lessonName = [sourceName, addons.includeVoiced && 'Voiced', addons.includeYoon && 'Yōon'].filter(Boolean).join(' + ')
   const order = session.deckOrder?.length ? session.deckOrder : session.results.map(result => result.kanaId)
   const resultById = new Map(session.results.map(result => [result.kanaId, result]))
   const cards = order.flatMap((kanaId, originalIndex) => {
@@ -63,7 +66,9 @@ export function LessonReviewPage() {
         <Flower />
         <div>
           <p className="eyebrow">Lesson review</p>
-          <h1>{session.type === 'review' ? 'Review Session' : session.source[0].toUpperCase() + session.source.slice(1) + ' Lesson'}</h1>
+          <div className='review-title-row'>
+            <h1>{session.type === 'review' ? 'Review Session' : lessonName + ' Lesson'}</h1>
+          </div>
           <p>{new Date(session.finishedAt).toLocaleString()} · {summary.correct}/{summary.total} correct · {summary.accuracy.toFixed(1)}%</p>
         </div>
       </header>

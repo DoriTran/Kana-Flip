@@ -1,6 +1,6 @@
 import {
   BookOpen, CheckCircle2, ClipboardList, Clock3, EyeOff, Flower,
-  Flower2, Gauge, Info, LockKeyhole, Play, Rabbit, RotateCcw, Settings2, Shuffle,
+  Flower2, Gauge, Info, LockKeyhole, Puzzle, Play, Rabbit, RotateCcw, Settings2, Shuffle,
   SlidersHorizontal, Sparkles, Star, Trash2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { SettingsDialog } from '../components/SettingsDialog'
 import { useKanaStore } from '../stores/kanaStore'
+import { sourceIds } from '../utils/session'
 import { recentWrongCount, slowReviewIds } from '../utils/stats'
 
 export function HomePage() {
@@ -96,10 +97,28 @@ export function HomePage() {
                 {selected && <CheckCircle2 className="choice-check" />}
                 <span className="choice-kana">{value === 'hiragana' ? 'あ' : value === 'katakana' ? 'ア' : 'あ + ア'}</span>
                 <strong>{value[0].toUpperCase() + value.slice(1)}</strong>
-                <small>{value === 'both' ? 92 : 46} characters</small>
+                <small>{sourceIds(value, p.includeVoiced, p.includeYoon).length} characters</small>
               </button>
             })}
           </div>
+          <section className="addon-section" aria-labelledby="addon-title">
+            <div className="addon-heading">
+              <Puzzle />
+              <div><h3 id="addon-title">Optional add-ons</h3><p>Add additional character groups to your selected set</p></div>
+            </div>
+            <div className="addon-grid">
+              <label className={'addon-card' + (p.includeVoiced ? ' selected' : '')}>
+                <input type="checkbox" checked={p.includeVoiced} onChange={event => setPreferences({ includeVoiced: event.target.checked })} />
+                <span><strong>Voiced marks</strong><small>+ Dakuten &amp; Handakuten</small></span>
+                <b aria-hidden>が</b>
+              </label>
+              <label className={'addon-card' + (p.includeYoon ? ' selected' : '')}>
+                <input type="checkbox" checked={p.includeYoon} onChange={event => setPreferences({ includeYoon: event.target.checked })} />
+                <span><strong>Yōon</strong><small>+ Small ゃゅょ combinations</small></span>
+                <b aria-hidden>きゃ</b>
+              </label>
+            </div>
+          </section>
           <div className="setup-divider" />
           <div className="setup-panel-heading"><RotateCcw /><div><h3>Review mode</h3><p>Focus on specific cards (optional)</p></div></div>
           <div className="study-choice-grid review-choice-grid">

@@ -498,7 +498,11 @@ button.setup-toggle-card:hover {
 }
 .history-page .history {
   margin-top: 0;
-  min-height: 220px;
+}
+.history-page .empty-history {
+  min-height: 120px;
+  display: grid;
+  place-content: center;
 }
 .history-page .section-heading {
   padding-bottom: 8px;
@@ -558,5 +562,229 @@ button.setup-toggle-card:hover {
   }
   .review-sort-button {
     font-size: 12px;
+  }
+}
+.addon-section {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 248, 246, .56);
+}
+.addon-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 11px;
+}
+.addon-heading > svg {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 auto;
+  color: var(--rose);
+}
+.addon-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.addon-heading p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: .76rem;
+}
+.addon-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.addon-card {
+  min-width: 0;
+  min-height: 68px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, .58);
+  cursor: pointer;
+  transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease;
+}
+.addon-card:hover {
+  border-color: #e5a9b2;
+}
+.addon-card:focus-within {
+  outline: 3px solid rgba(197, 76, 98, .2);
+  outline-offset: 2px;
+}
+.addon-card.selected {
+  border-color: var(--rose);
+  background: linear-gradient(145deg, #fff5f5, #f9e2e5);
+  box-shadow: 0 6px 15px rgba(185, 93, 111, .08);
+}
+.addon-card input {
+  width: 19px;
+  height: 19px;
+  margin: 0;
+  accent-color: var(--rose);
+}
+.addon-card span {
+  min-width: 0;
+}
+.addon-card strong,
+.addon-card small {
+  display: block;
+}
+.addon-card strong {
+  font-size: .9rem;
+}
+.addon-card small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: .7rem;
+  white-space: nowrap;
+}
+.addon-card > b {
+  color: #cd7886;
+  font: 500 1.5rem 'Noto Serif JP', serif;
+  white-space: nowrap;
+}
+@media (max-width: 650px) {
+  .addon-grid {
+    grid-template-columns: 1fr;
+  }
+  .addon-card small {
+    white-space: normal;
+  }
+}
+
+/* Keep the home intro compact so study controls stay above the fold. */
+.hero {
+  height: 88px;
+  padding: 6px 36px;
+}
+
+.hero h1 {
+  margin: 3px 0;
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+.hero p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.hero-art {
+  gap: 7px;
+}
+
+.hero-art svg:first-child {
+  width: 56px;
+  height: 56px;
+}
+
+.hero-art svg:last-child {
+  width: 27px;
+  height: 27px;
+}
+
+@media (max-width: 720px) {
+  .hero {
+    height: 82px;
+    padding: 6px 10px;
+  }
+
+  .hero h1 {
+    font-size: 24px;
+  }
+}
+
+.hero .eyebrow {
+  display: none;
+}
+
+.slow-review-choice > span > strong {
+  white-space: nowrap;
+}
+
+.slow-review-controls {
+  grid-template-columns: 86px 108px;
+  font-size: .9rem;
+}
+
+.slow-review-controls > label {
+  min-height: 40px;
+}
+
+.slow-review-controls label {
+  gap: 2px;
+}
+
+.slow-review-controls input {
+  width: 2.8ch;
+}
+
+.session-addon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border: 1px solid #efc2ca;
+  border-radius: 999px;
+  background: #fff1f3;
+  color: var(--rose);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.session-title-row .session-addon-badge svg,
+.review-title-row .session-addon-badge svg {
+  width: 11px;
+  height: 11px;
+}
+
+.review-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.history-page .history article {
+  grid-template-columns: 42px minmax(260px, 1.8fr) repeat(4, minmax(80px, 1fr)) auto;
+}
+
+.history-page .history .review-row {
+  grid-template-columns: 42px minmax(260px, 1.8fr) 1fr auto;
+}
+
+.session-title-row > span:first-child {
+  white-space: nowrap;
+}
+
+.session-addon-title {
+  letter-spacing: -.05em;
+}
+
+.history-kana.both-kana {
+  padding-right: 2px;
+  font-size: 16px;
+  letter-spacing: -3px;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .history-page .history article,
+  .history-page .history .review-row {
+    grid-template-columns: 35px minmax(0, 1fr) auto;
+  }
+
+  .session-addon-badge {
+    padding-inline: 5px;
   }
 }
