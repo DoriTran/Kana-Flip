@@ -5,8 +5,8 @@ import type { ActiveStudySession, KanaProgress, StudyPreferences, StudySession, 
 import { archiveSession, createActiveSession, sourceIds } from '../utils/session'
 import { recentWrongCount, slowReviewIds } from '../utils/stats'
 
-const defaults: StudyPreferences = { characterSet:'hiragana', includeVoiced:false, includeYoon:false, reviewMode:'none', slowReviewMode:'top-30', slowTopCount:30, slowThresholdMs:5000, reviewMistakesAtEnd:true, shuffled:true, lockNavigation:false, timerMs:null, recordSession:true, readyFirstCard:false, showKeyboardHints:true, reducedMotion:false }
-interface KanaState { preferences:StudyPreferences; kanaProgress:Record<string,KanaProgress>; sessions:StudySession[]; activeSession:ActiveStudySession|null; setPreferences:(patch:Partial<StudyPreferences>)=>void; startSession:(sourceOverride?:StudySource, idsOverride?:string[])=>boolean; beginSession:()=>void; discardSession:()=>void; deleteSession:(id:string)=>void; toggleStar:(id:string)=>void; flip:()=>void; navigate:(delta:number)=>void; grade:(grade:'correct'|'wrong',elapsedMs:number)=>void; addReviewTime:(kanaId:string,elapsedMs:number)=>void; archiveActive:()=>StudySession|null; reviewActiveMistakes:()=>boolean; pauseTimer:()=>void; resumeTimer:()=>void; clearAll:()=>void }
+const defaults: StudyPreferences = { characterSet:'hiragana', includeVoiced:false, includeYoon:false, reviewMode:'none', slowReviewMode:'top-30', slowTopCount:30, slowThresholdMs:5000, reviewMistakesAtEnd:true, shuffled:true, lockNavigation:false, allowRegrading:false, timerMs:null, recordSession:true, readyFirstCard:false, showKeyboardHints:true, reducedMotion:false, confirmDiscard:false }
+interface KanaState { preferences:StudyPreferences; kanaProgress:Record<string,KanaProgress>; sessions:StudySession[]; activeSession:ActiveStudySession|null; setPreferences:(patch:Partial<StudyPreferences>)=>void; startSession:(sourceOverride?:StudySource, idsOverride?:string[])=>boolean; beginSession:()=>void; discardSession:()=>void; deleteSession:(id:string)=>void; toggleStar:(id:string)=>void; flip:()=>void; navigate:(delta:number)=>void; grade:(grade:'correct'|'wrong',elapsedMs:number)=>void; regrade:(grade:'correct'|'wrong')=>void; addReviewTime:(kanaId:string,elapsedMs:number)=>void; archiveActive:()=>StudySession|null; reviewActiveMistakes:()=>boolean; pauseTimer:()=>void; resumeTimer:()=>void; clearAll:()=>void }
 const progressFor=(id:string):KanaProgress=>({kanaId:id,starred:false,bestRecognitionMs:null,totalCorrect:0,totalWrong:0,lastStudiedAt:null})
 
 export const useKanaStore=create<KanaState>()(persist((set,get)=>({
@@ -26,10 +26,31 @@ export const useKanaStore=create<KanaState>()(persist((set,get)=>({
     return{activeSession:{...active,currentIndex:next,flipped:false,timerRemainingMs,timerStartedAt:s.preferences.timerMs!=null&&!target.graded?Date.now():null}}
   }),
   grade:(grade,elapsedMs)=>set(s=>{const a=s.activeSession;if(!a||a.completed)return{}; if(a.reviewPhase){const id=a.reviewQueue[a.reviewIndex];const reviewTimings={...a.reviewTimings,[id]:(a.reviewTimings[id]??0)+elapsedMs};const reviewIndex=a.reviewIndex+1;return{activeSession:{...a,reviewTimings,reviewIndex,flipped:false,completed:reviewIndex>=a.reviewQueue.length,timerRemainingMs:s.preferences.timerMs,timerStartedAt:s.preferences.timerMs?Date.now():null}}} const entry=a.deck[a.currentIndex];if(entry.graded)return{};const deck=[...a.deck];deck[a.currentIndex]={...entry,graded:true,grade,recognitionMs:elapsedMs};const reviewQueue=grade==='wrong'&&s.preferences.reviewMistakesAtEnd?[...a.reviewQueue,entry.kanaId]:a.reviewQueue;const allGraded=deck.every(e=>e.graded);let next=allGraded?a.currentIndex:deck.findIndex((e,i)=>i>a.currentIndex&&!e.graded);if(next<0&&!allGraded)next=deck.findIndex(e=>!e.graded);const reviewPhase=allGraded&&reviewQueue.length>0;const completed=allGraded&&!reviewPhase;const progress={...s.kanaProgress};if(a.type==='study'){const old=progress[entry.kanaId]??progressFor(entry.kanaId);progress[entry.kanaId]={...old,totalCorrect:old.totalCorrect+(grade==='correct'?1:0),totalWrong:old.totalWrong+(grade==='wrong'?1:0),lastStudiedAt:Date.now(),bestRecognitionMs:old.bestRecognitionMs==null||elapsedMs<old.bestRecognitionMs?elapsedMs:old.bestRecognitionMs}}return{kanaProgress:progress,activeSession:{...a,deck,reviewQueue,reviewPhase,completed,currentIndex:next,reviewIndex:0,flipped:false,timerRemainingMs:s.preferences.timerMs,timerStartedAt:s.preferences.timerMs?Date.now():null}}}),
+  regrade:grade=>set(s=>{
+    const active=s.activeSession
+    if(!active||active.completed||active.reviewPhase||!s.preferences.allowRegrading)return{}
+    const entry=active.deck[active.currentIndex]
+    if(!entry?.graded||entry.grade===grade)return{}
+    const deck=[...active.deck]
+    deck[active.currentIndex]={...entry,grade}
+    const reviewQueue=s.preferences.reviewMistakesAtEnd
+      ? grade==='wrong' ? [...active.reviewQueue,entry.kanaId] : active.reviewQueue.filter(id=>id!==entry.kanaId)
+      : active.reviewQueue
+    const progress={...s.kanaProgress}
+    if(active.type==='study'){
+      const old=progress[entry.kanaId]??progressFor(entry.kanaId)
+      progress[entry.kanaId]={
+        ...old,
+        totalCorrect:Math.max(0,old.totalCorrect+(grade==='correct'?1:-1)),
+        totalWrong:Math.max(0,old.totalWrong+(grade==='wrong'?1:-1)),
+      }
+    }
+    return{kanaProgress:progress,activeSession:{...active,deck,reviewQueue}}
+  }),
   addReviewTime:(id,ms)=>set(s=>s.activeSession?{activeSession:{...s.activeSession,reviewTimings:{...s.activeSession.reviewTimings,[id]:(s.activeSession.reviewTimings[id]??0)+ms}}}:{}),
   archiveActive:()=>{const s=get();if(!s.activeSession||!s.activeSession.completed)return null;const archived=archiveSession(s.activeSession);set({sessions:s.activeSession.recordSession?[archived,...s.sessions]:s.sessions,activeSession:null});return archived},
   reviewActiveMistakes:()=>{const s=get(),a=s.activeSession;if(!a||!a.completed)return false;const ids=[...new Set(a.deck.filter(e=>e.grade==='wrong').map(e=>e.kanaId))];if(!ids.length)return false;const archived=archiveSession(a);set({sessions:a.recordSession?[archived,...s.sessions]:s.sessions,activeSession:createActiveSession(ids,{...s.preferences,reviewMode:'none'},'session-mistakes','review')});return true},
   pauseTimer:()=>set(s=>{const a=s.activeSession;if(!a||a.timerStartedAt==null||a.timerRemainingMs==null)return{};return{activeSession:{...a,timerRemainingMs:Math.max(0,a.timerRemainingMs-(Date.now()-a.timerStartedAt)),timerStartedAt:null}}}),
   resumeTimer:()=>set(s=>{const a=s.activeSession;if(!a||a.timerRemainingMs==null||a.completed)return{};return{activeSession:{...a,timerStartedAt:Date.now()}}}),
   clearAll:()=>set({preferences:defaults,kanaProgress:{},sessions:[],activeSession:null}),
-}),{name:'kanaflip:v1',version:8,migrate:p=>{const state=p as KanaState;return{...state,preferences:{...defaults,...state.preferences},activeSession:state.activeSession?{...state.activeSession,shuffled:state.activeSession.shuffled??state.preferences.shuffled,reviewMistakesAtEnd:state.activeSession.reviewMistakesAtEnd??state.preferences.reviewMistakesAtEnd,includeVoiced:state.activeSession.includeVoiced??state.preferences.includeVoiced??false,includeYoon:state.activeSession.includeYoon??state.preferences.includeYoon??false,sessionTimerMs:state.activeSession.sessionTimerMs??state.preferences.timerMs,recordSession:state.activeSession.recordSession??true,waitingToStart:state.activeSession.waitingToStart??false}:null}},partialize:s=>({preferences:s.preferences,kanaProgress:s.kanaProgress,sessions:s.sessions,activeSession:s.activeSession})}))
+}),{name:'kanaflip:v1',version:10,migrate:p=>{const state=p as KanaState;return{...state,preferences:{...defaults,...state.preferences},activeSession:state.activeSession?{...state.activeSession,shuffled:state.activeSession.shuffled??state.preferences.shuffled,reviewMistakesAtEnd:state.activeSession.reviewMistakesAtEnd??state.preferences.reviewMistakesAtEnd,includeVoiced:state.activeSession.includeVoiced??state.preferences.includeVoiced??false,includeYoon:state.activeSession.includeYoon??state.preferences.includeYoon??false,sessionTimerMs:state.activeSession.sessionTimerMs??state.preferences.timerMs,recordSession:state.activeSession.recordSession??true,waitingToStart:state.activeSession.waitingToStart??false}:null}},partialize:s=>({preferences:s.preferences,kanaProgress:s.kanaProgress,sessions:s.sessions,activeSession:s.activeSession})}))

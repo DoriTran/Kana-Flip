@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { allKana, hiragana, katakana } from '../data/kana'
 import type { StudyPreferences, StudySession } from '../types/kana'
-import { archiveSession, createActiveSession, sourceIds } from './session'
+import { archiveSession, createActiveSession, sourceIds, studyTitle } from './session'
 import { latestStudies, recentWrongCount, sessionSummary, slowReviewIds } from './stats'
 
-const preferences: StudyPreferences = { characterSet:'hiragana', includeVoiced:false, includeYoon:false, reviewMode:'none', slowReviewMode:'top-30', slowTopCount:30, slowThresholdMs:5000, reviewMistakesAtEnd:true, shuffled:false, lockNavigation:false, timerMs:null, recordSession:true, readyFirstCard:false, showKeyboardHints:true, reducedMotion:false }
+describe('Learn titles',()=>{
+  it('shows add-on groups as the primary title',()=>{
+    expect(studyTitle({source:'addons',includeVoiced:true,includeYoon:false})).toBe('Voiced')
+    expect(studyTitle({source:'addons',includeVoiced:false,includeYoon:true})).toBe('Yōon')
+    expect(studyTitle({source:'addons',includeVoiced:true,includeYoon:true})).toBe('Voiced + Yōon')
+  })
+  it('includes add-ons after the base set',()=>{
+    expect(studyTitle({source:'hiragana',includeVoiced:true,includeYoon:true})).toBe('Hiragana + Voiced + Yōon')
+    expect(studyTitle({source:'katakana',includeVoiced:true,includeYoon:false})).toBe('Katakana + Voiced')
+    expect(studyTitle({source:'both',includeVoiced:false,includeYoon:false})).toBe('Both')
+  })
+})
+
+const preferences: StudyPreferences = { characterSet:'hiragana', includeVoiced:false, includeYoon:false, reviewMode:'none', slowReviewMode:'top-30', slowTopCount:30, slowThresholdMs:5000, reviewMistakesAtEnd:true, shuffled:false, lockNavigation:false, allowRegrading:false, timerMs:null, recordSession:true, readyFirstCard:false, showKeyboardHints:true, reducedMotion:false, confirmDiscard:false }
 
 describe('kana data',()=>{
   it('contains 104 entries per alphabet with paired sounds',()=>{
@@ -22,6 +35,14 @@ describe('kana data',()=>{
     expect(sourceIds('both',true,false)).toHaveLength(142)
     expect(sourceIds('both',false,true)).toHaveLength(134)
     expect(sourceIds('both',true,true)).toHaveLength(208)
+    expect(sourceIds('addons',true,false)).toHaveLength(50)
+    expect(sourceIds('addons',false,true)).toHaveLength(42)
+    expect(sourceIds('addons',true,true)).toHaveLength(116)
+    for (const id of sourceIds('addons',true,true)) {
+      expect(allKana.find(kana => kana.id === id)?.variant).not.toBe('basic')
+    }
+    expect(sourceIds('addons',true,true).some(id => id.startsWith('hiragana-'))).toBe(true)
+    expect(sourceIds('addons',true,true).some(id => id.startsWith('katakana-'))).toBe(true)
   })
   it('requires the matching add-ons for voiced, Yōon and voiced Yōon kana',()=>{
     expect(sourceIds('hiragana')).toContain('hiragana-a')
@@ -30,6 +51,8 @@ describe('kana data',()=>{
     expect(sourceIds('hiragana',false,true)).toContain('hiragana-kya')
     expect(sourceIds('hiragana',false,true)).not.toContain('hiragana-gya')
     expect(sourceIds('hiragana',true,true)).toContain('hiragana-gya')
+    expect(sourceIds('addons',false,true)).not.toContain('hiragana-gya')
+    expect(sourceIds('addons',true,true)).toContain('hiragana-gya')
   })
 })
 describe('sessions',()=>{it('archives deck order, primary scores and cumulative end-review timing',()=>{const active=createActiveSession(['hiragana-a'],preferences,'hiragana','study');active.deck[0]={...active.deck[0],graded:true,grade:'wrong',recognitionMs:500};active.reviewTimings['hiragana-a']=700;active.completed=true;const session=archiveSession(active);expect(session.deckOrder).toEqual(['hiragana-a']);expect(session.results[0]).toMatchObject({correctCount:0,wrongCount:1,recognitionTimes:[1200]});expect(sessionSummary(session).averageMs).toBe(1200)})

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { kanaById } from '../data/kana'
 import { useKanaStore } from '../stores/kanaStore'
-import { archiveSession } from '../utils/session'
+import { archiveSession, studyTitle } from '../utils/session'
 import { formatTime, sessionSummary } from '../utils/stats'
 
 const isTextControl = (target: EventTarget | null) => target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable="true"]')
@@ -18,7 +18,11 @@ export function LearningPage() {
   const resetClock = useCallback(() => { shownAt.current = performance.now() }, [])
   const grade = useCallback((answer: 'correct' | 'wrong') => {
     const session = store.activeSession
-    if (!session || session.completed || (!session.reviewPhase && session.deck[session.currentIndex]?.graded)) return
+    if (!session || session.completed) return
+    if (!session.reviewPhase && session.deck[session.currentIndex]?.graded) {
+      if (store.preferences.allowRegrading) store.regrade(answer)
+      return
+    }
     store.grade(answer, Math.max(0, performance.now() - shownAt.current))
   }, [store])
 
@@ -62,20 +66,20 @@ export function LearningPage() {
   if (!active) return <Navigate to="/" replace />
   if (active.completed) return <ResultView />
   if (!cardId) return <Navigate to="/" replace />
-  if (active.waitingToStart) return <div className={`learn-page ${store.preferences.reducedMotion ? 'reduced-motion' : ''}`}><header className="learn-top"><button onClick={() => nav('/')}><ArrowLeft /> Exit</button><span><b>Get ready</b><small>{active.source.replace('-', ' ')}</small></span><div /></header><main className="ready-stage"><button className="ready-card" onClick={() => { store.beginSession(); resetClock() }}><Sparkles /><strong>Ready?</strong><span>Press any key or tap to begin</span></button></main></div>
+  if (active.waitingToStart) return <div className={`learn-page ${store.preferences.reducedMotion ? 'reduced-motion' : ''}`}><header className="learn-top"><button onClick={() => nav('/')}><ArrowLeft /> Exit</button><span><b>Get ready</b><small>{studyTitle(active)}</small></span><div /></header><main className="ready-stage"><button className="ready-card" onClick={() => { store.beginSession(); resetClock() }}><Sparkles /><strong>Ready?</strong><span>Press any key or tap to begin</span></button></main></div>
   const kana = kanaById[cardId]
   const graded = active.deck.filter(item => item.graded)
   const correct = graded.filter(item => item.grade === 'correct').length
   const wrong = graded.filter(item => item.grade === 'wrong').length
-  const canGrade = active.reviewPhase || !entry?.graded
+  const canGrade = active.reviewPhase || !entry?.graded || store.preferences.allowRegrading
   const progress = active.reviewPhase ? active.reviewIndex / active.reviewQueue.length : graded.length / active.deck.length
   const count = active.reviewPhase ? `${active.reviewIndex + 1} / ${active.reviewQueue.length}` : `${graded.length} / ${active.deck.length}`
   const answer = kana.alphabet === 'katakana' ? kana.romaji[0].toUpperCase() + kana.romaji.slice(1) : kana.romaji
   const navigationLocked = store.preferences.lockNavigation || store.preferences.timerMs != null
 
   return <div className={`learn-page ${store.preferences.reducedMotion ? 'reduced-motion' : ''}`}>
-    <header className="learn-top"><button onClick={() => nav('/')}><ArrowLeft /> Exit</button><span><b>{active.reviewPhase ? 'End Review' : active.type === 'review' ? 'Review' : 'Study'}</b><small>{active.source.replace('-', ' ')}</small></span><div><button className="icon-button" onClick={() => setHelp(true)} aria-label="Keyboard shortcuts"><HelpCircle /></button></div></header>
-    <div className="progress-wrap"><div className="progress-rail"><i style={{ width: `${progress * 100}%` }} /></div><b>{count}</b><span className="score good">✓ {correct}</span><span className="score bad">× {wrong}</span></div>
+    <header className="learn-top"><button onClick={() => nav('/')}><ArrowLeft /> Exit</button><span><b>{active.reviewPhase ? 'End Review' : active.type === 'review' ? 'Review · ' + active.source.replace('-', ' ') : studyTitle(active)}</b></span><div><button className="icon-button" onClick={() => setHelp(true)} aria-label="Keyboard shortcuts"><HelpCircle /></button></div></header>
+    <div className="progress-wrap"><div className="progress-rail"><i style={{ width: `${progress * 100}%` }} /></div><div className="progress-meta"><b>{count}</b><div className="progress-scores"><span className="score good">✓ {correct}</span><span className="score bad">× {wrong}</span></div></div></div>
     {active.reviewPhase && <p className="review-label"><RotateCcw /> Review · {active.reviewQueue.length - active.reviewIndex} cards to revisit</p>}
     <main className={`study-stage ${navigationLocked ? 'locked' : ''}`}>
       {!navigationLocked && <button className="side-nav" onClick={() => store.navigate(-1)} disabled={active.reviewPhase || active.currentIndex === 0}><ArrowLeft /></button>}

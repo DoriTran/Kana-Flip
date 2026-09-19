@@ -303,6 +303,14 @@ button.setup-toggle-card:hover {
   margin: 0 auto;
   font-size: 1.15rem;
 }
+.setup-redesign > .resume-banner {
+  position: relative;
+  z-index: 1;
+  width: min(620px, 62%);
+  min-height: 54px;
+  margin: 0 auto;
+  padding: 7px 12px;
+}
 .setup-corner-art {
   position: absolute;
   bottom: 8px;
@@ -320,7 +328,8 @@ button.setup-toggle-card:hover {
 @media (max-width: 980px) {
   .setup-columns { grid-template-columns: 1fr; }
   .setup-panel { height: auto; }
-  .setup-redesign > .start { width: min(620px, 80%); }
+  .setup-redesign > .start,
+  .setup-redesign > .resume-banner { width: min(620px, 80%); }
 }
 @media (max-width: 650px) {
   .setup-redesign { padding: 20px 14px; }
@@ -331,11 +340,12 @@ button.setup-toggle-card:hover {
   .timer-setting-card .timer-segments { grid-column: 1 / -1; width: 100%; }
   .timer-segments { grid-template-columns: repeat(4, 1fr); }
   .timer-segments button { padding: 0 6px; }
-  .setup-redesign > .start { width: 100%; }
+  .setup-redesign > .start,
+  .setup-redesign > .resume-banner { width: 100%; }
 }
 
 /* Timer input refinement and wider home setup */
-.app-shell:has(.setup-redesign) {
+.app-shell {
   max-width: 1200px;
 }
 .setup-columns {
@@ -501,8 +511,14 @@ button.setup-toggle-card:hover {
 }
 .history-page .empty-history {
   min-height: 120px;
-  display: grid;
-  place-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.history-page .empty-history p {
+  margin: 0;
 }
 .history-page .section-heading {
   padding-bottom: 8px;
@@ -566,10 +582,21 @@ button.setup-toggle-card:hover {
 }
 .addon-section {
   margin-top: 16px;
+  position: relative;
+  cursor: pointer;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: rgba(255, 248, 246, .56);
+}
+.addon-section.selected {
+  border-color: var(--rose);
+  background: linear-gradient(145deg, #fff8f8, #fff1f3);
+  box-shadow: 0 6px 15px rgba(185, 93, 111, .08);
+}
+.addon-section:focus-visible {
+  outline: 3px solid rgba(197, 76, 98, .24);
+  outline-offset: 2px;
 }
 .addon-heading {
   display: flex;
@@ -767,15 +794,60 @@ button.setup-toggle-card:hover {
   white-space: nowrap;
 }
 
-.session-addon-title {
-  letter-spacing: -.05em;
-}
-
 .history-kana.both-kana {
   padding-right: 2px;
   font-size: 16px;
   letter-spacing: -3px;
   white-space: nowrap;
+}
+
+.history-kana.addon-kana {
+  font-size: 16px;
+}
+
+.progress-wrap {
+  width: min(600px, calc(100% - 48px));
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 14px 0;
+}
+
+.progress-wrap .progress-rail {
+  width: 100%;
+}
+
+.progress-meta {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.progress-scores {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.progress-scores .score {
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.learn-top > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .progress-wrap {
+    width: calc(100% - 32px);
+  }
 }
 
 @media (max-width: 720px) {

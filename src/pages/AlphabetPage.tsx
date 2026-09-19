@@ -37,7 +37,7 @@ export function AlphabetPage() {
 
   return <Layout onSettings={() => setSettings(true)}>
     <main>
-      <section className="alphabet-head"><p className="eyebrow">文字を見つけよう</p><h1>Alphabet</h1><p>Browse, star, and get to know every kana.</p></section>
+      <section className="alphabet-head"><h1>Alphabet</h1><p>Browse, star, and get to know every kana.</p></section>
       <div className="alphabet-toolbar">
         <div className="tabs">{(['hiragana', 'katakana', 'both', 'starred'] as Tab[]).map(value => <button key={value} className={tab === value ? 'active' : ''} onClick={() => setTab(value)}>{value === 'starred' && <Star />}{value[0].toUpperCase() + value.slice(1)}</button>)}</div>
         <div className="search-sort">

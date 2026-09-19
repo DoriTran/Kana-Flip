@@ -1,6 +1,13 @@
 import { allKana } from '../data/kana'
 import type { ActiveStudySession, StudyPreferences, StudySession, StudySource } from '../types/kana'
 
+export const studyTitle = (session: Pick<ActiveStudySession, 'source' | 'includeVoiced' | 'includeYoon'>) => {
+  const addons = [session.includeVoiced && 'Voiced', session.includeYoon && 'Yōon'].filter(Boolean)
+  if (session.source === 'addons') return addons.join(' + ') || 'Add-ons'
+  const source = session.source[0].toUpperCase() + session.source.slice(1)
+  return [source, ...addons].join(' + ')
+}
+
 export const shuffle = <T,>(items: T[]) => { const copy=[...items]; for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]]} return copy }
 export const createActiveSession = (ids: string[], preferences: StudyPreferences, source: StudySource, type: 'study'|'review'): ActiveStudySession => {
   const deck = (preferences.shuffled ? shuffle(ids) : ids).map(kanaId=>({kanaId,graded:false,grade:null,recognitionMs:null}))
@@ -32,5 +39,5 @@ export const sourceIds = (
   includeVoiced = false,
   includeYoon = false,
 ) => allKana
-  .filter(kana => (set === 'both' || kana.alphabet === set) && variantEnabled(kana.variant, includeVoiced, includeYoon))
+  .filter(kana => (set === 'addons' ? kana.variant !== 'basic' : set === 'both' || kana.alphabet === set) && variantEnabled(kana.variant, includeVoiced, includeYoon))
   .map(kana => kana.id)

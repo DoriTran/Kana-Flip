@@ -8,14 +8,23 @@ import type { StudySession } from '../types/kana'
 import { sessionAddons } from '../utils/session'
 import { formatTime, sessionSummary } from '../utils/stats'
 
-const sourceLabel = (source: string) => source.split('-').map(part => part[0].toUpperCase() + part.slice(1)).join(' ')
+const sourceLabel = (source: string) => source === 'addons' ? 'Add-ons' : source.split('-').map(part => part[0].toUpperCase() + part.slice(1)).join(' ')
 
 function sessionTitle(session: StudySession) {
   const base = session.type === 'review' ? 'Review · ' + sourceLabel(session.source) : sourceLabel(session.source)
-  if (session.type !== 'study') return { base, addons: '' }
+  if (session.type !== 'study') return base
   const { includeVoiced, includeYoon } = sessionAddons(session)
   const addons = [includeVoiced && 'Voiced', includeYoon && 'Yōon'].filter(Boolean).join(' + ')
-  return { base, addons: addons ? ' + ' + addons : '' }
+  if (session.source === 'addons') return addons || base
+  return addons ? base + ' + ' + addons : base
+}
+
+function sessionKana(session: StudySession) {
+  if (session.source === 'addons') {
+    const { includeVoiced, includeYoon } = sessionAddons(session)
+    return includeVoiced && includeYoon ? 'じゃ' : includeVoiced ? 'が' : 'ゃ'
+  }
+  return session.source === 'both' ? 'あア' : session.source === 'katakana' ? 'ア' : session.source === 'hiragana' ? 'あ' : null
 }
 
 export function HistoryPage() {
@@ -37,12 +46,12 @@ export function HistoryPage() {
           ? <div className='empty-history'><Clock3 /><p>Your completed sessions will bloom here.</p></div>
           : sessions.map(session => {
             const summary = sessionSummary(session)
-            const title = sessionTitle(session)
+            const kana = sessionKana(session)
             return <article key={session.id} className={session.type === 'review' ? 'review-row' : ''}>
-              <span className={'history-kana' + (session.source === 'both' ? ' both-kana' : '')}>{session.source === 'both' ? 'あア' : session.source === 'katakana' ? 'ア' : session.source === 'hiragana' ? 'あ' : <BookOpenCheck aria-label='Review' />}</span>
+              <span className={'history-kana' + (session.source === 'addons' ? ' addon-kana' : '') + (kana && kana.length > 1 ? ' both-kana' : '')}>{kana ?? <BookOpenCheck aria-label='Review' />}</span>
               <div>
                 <b className='session-title-row'>
-                  <span>{title.base}<span className='session-addon-title'>{title.addons}</span></span>
+                  <span>{sessionTitle(session)}</span>
                   {session.reviewMistakesAtEnd && <RotateCcw aria-label='Review mistakes at end' />}
                   {session.shuffled && <Shuffle aria-label='Shuffled' />}
                   {session.timerMs != null && <Clock3 aria-label='Timer on' />}

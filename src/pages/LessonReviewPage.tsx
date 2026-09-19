@@ -30,7 +30,7 @@ export function LessonReviewPage() {
 
   const summary = sessionSummary(session)
   const addons = sessionAddons(session)
-  const sourceName = session.source[0].toUpperCase() + session.source.slice(1)
+  const sourceName = session.source === 'addons' ? 'Add-ons' : session.source[0].toUpperCase() + session.source.slice(1)
   const lessonName = [sourceName, addons.includeVoiced && 'Voiced', addons.includeYoon && 'Yōon'].filter(Boolean).join(' + ')
   const order = session.deckOrder?.length ? session.deckOrder : session.results.map(result => result.kanaId)
   const resultById = new Map(session.results.map(result => [result.kanaId, result]))

@@ -23,7 +23,9 @@ export function HomePage() {
   const starred = Object.values(kanaProgress).filter(kana => kana.starred).length
   const recent = Object.keys(kanaProgress).filter(id => recentWrongCount(sessions, id) > 0).length
   const slowIds = slowReviewIds(sessions, p.slowReviewMode, p.slowThresholdMs, p.slowTopCount)
-  const empty = p.reviewMode === 'starred' && !starred
+  const empty = p.reviewMode === 'none' && p.characterSet === 'addons' && !p.includeVoiced && !p.includeYoon
+    ? 'Select at least Voiced marks or Yōon to start learning.'
+    : p.reviewMode === 'starred' && !starred
     ? 'Star a few kana first to study them here.'
     : p.reviewMode === 'recent-mistakes' && !recent ? 'No recent mistakes — lovely work!'
       : p.reviewMode === 'slowest' && !slowIds.length
@@ -80,8 +82,6 @@ export function HomePage() {
 
   return <Layout onSettings={() => setSettings(true)}><main>
     <section className="hero"><div><p className="eyebrow">毎日、少しずつ</p><h1>お勉強しましょう？</h1><p>A little practice goes a long way ♡</p></div><div className="hero-art" aria-hidden><Rabbit /><Flower2 /></div></section>
-    {activeSession && !activeSession.completed && <section className="resume-banner"><div><RotateCcw /><span><b>Study in progress</b><small>{activeSession.currentIndex + 1} of {activeSession.deck.length} cards</small></span></div><div><button onClick={() => nav('/learn')}>Resume session</button><button className="text-danger" onClick={() => setDiscard(true)}><Trash2 /> Discard</button></div></section>}
-
     <section className="paper-card setup setup-redesign">
       <header className="setup-redesign-header">
         <div className="section-heading"><Flower2 /><div><h2>Study Setup</h2><p>Choose what you want to study ♡</p></div></div>
@@ -101,19 +101,34 @@ export function HomePage() {
               </button>
             })}
           </div>
-          <section className="addon-section" aria-labelledby="addon-title">
+          <section
+            className={'addon-section' + (p.reviewMode === 'none' && p.characterSet === 'addons' ? ' selected' : '')}
+            role="radio"
+            tabIndex={0}
+            aria-checked={p.reviewMode === 'none' && p.characterSet === 'addons'}
+            aria-labelledby="addon-title"
+            onClick={() => setPreferences({ characterSet: 'addons', reviewMode: 'none' })}
+            onKeyDown={event => {
+              if (event.target !== event.currentTarget) return
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                setPreferences({ characterSet: 'addons', reviewMode: 'none' })
+              }
+            }}
+          >
+            {p.reviewMode === 'none' && p.characterSet === 'addons' && <CheckCircle2 className="choice-check" />}
             <div className="addon-heading">
               <Puzzle />
-              <div><h3 id="addon-title">Optional add-ons</h3><p>Add additional character groups to your selected set</p></div>
+              <div><h3 id="addon-title">Add-ons</h3><p>Add to your set, or study on their own</p></div>
             </div>
             <div className="addon-grid">
-              <label className={'addon-card' + (p.includeVoiced ? ' selected' : '')}>
-                <input type="checkbox" checked={p.includeVoiced} onChange={event => setPreferences({ includeVoiced: event.target.checked })} />
+              <label className={'addon-card' + (p.includeVoiced ? ' selected' : '')} onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
+                <input type="checkbox" checked={p.includeVoiced} onClick={event => event.stopPropagation()} onChange={event => setPreferences({ includeVoiced: event.target.checked })} />
                 <span><strong>Voiced marks</strong><small>+ Dakuten &amp; Handakuten</small></span>
                 <b aria-hidden>が</b>
               </label>
-              <label className={'addon-card' + (p.includeYoon ? ' selected' : '')}>
-                <input type="checkbox" checked={p.includeYoon} onChange={event => setPreferences({ includeYoon: event.target.checked })} />
+              <label className={'addon-card' + (p.includeYoon ? ' selected' : '')} onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
+                <input type="checkbox" checked={p.includeYoon} onClick={event => event.stopPropagation()} onChange={event => setPreferences({ includeYoon: event.target.checked })} />
                 <span><strong>Yōon</strong><small>+ Small ゃゅょ combinations</small></span>
                 <b aria-hidden>きゃ</b>
               </label>
@@ -229,11 +244,16 @@ export function HomePage() {
             <button className={'setup-toggle-card' + (p.lockNavigation ? ' is-on' : '')} onClick={() => setPreferences({ lockNavigation: !p.lockNavigation })} aria-pressed={p.lockNavigation}>
               <LockKeyhole /><span><strong>Lock back &amp; forth</strong><small>Hide Previous and Next navigation</small></span><i className="setup-switch" aria-hidden />
             </button>
+            <button className={'setup-toggle-card' + (p.allowRegrading ? ' is-on' : '')} onClick={() => setPreferences({ allowRegrading: !p.allowRegrading })} aria-pressed={p.allowRegrading}>
+              <RotateCcw /><span><strong>Change answers</strong><small>Change Wrong or Correct on answered cards</small></span><i className='setup-switch' aria-hidden />
+            </button>
           </div>
         </section>
       </div>
       {empty && <p className="empty-note">{empty}</p>}
-      <button className="primary start" disabled={!!empty || !!activeSession} onClick={start}><Play /> {p.reviewMode === 'none' ? 'Start Learning' : 'Start Review'}</button>
+      {activeSession && !activeSession.completed
+        ? <section className="resume-banner"><div><RotateCcw /><span><b>Study in progress</b><small>{activeSession.currentIndex + 1} of {activeSession.deck.length} cards</small></span></div><div><button onClick={() => nav('/learn')}>Resume session</button><button className="text-danger" onClick={() => p.confirmDiscard ? setDiscard(true) : store.discardSession()}><Trash2 /> Discard</button></div></section>
+        : <button className="primary start" disabled={!!empty || !!activeSession} onClick={start}><Play /> {p.reviewMode === 'none' ? 'Start Learning' : 'Start Review'}</button>}
       <div className="setup-corner-art left" aria-hidden><Rabbit /><Flower2 /></div>
       <div className="setup-corner-art right" aria-hidden><Flower /><Flower2 /></div>
     </section>
