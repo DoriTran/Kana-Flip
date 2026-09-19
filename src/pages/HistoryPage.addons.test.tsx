@@ -25,3 +25,14 @@ it('shows Add-ons groups as the main History title with matching kana', () => {
   expect(screen.getByText('が')).toBeTruthy()
   expect(screen.getByText('ゃ')).toBeTruthy()
 })
+
+it('shows History dates as day/month/year and time without seconds', () => {
+  const finishedAt = new Date(2026, 8, 19, 15, 31, 3).getTime()
+  useKanaStore.setState({ sessions: [{
+    id: 'dated', type: 'study', source: 'hiragana', startedAt: finishedAt - 1000,
+    finishedAt, shuffled: false, timerMs: null, reviewMistakesAtEnd: false,
+    results: [{ kanaId: 'hiragana-a', correctCount: 1, wrongCount: 0, recognitionTimes: [1000] }],
+  }] })
+  render(<MemoryRouter><HistoryPage /></MemoryRouter>)
+  expect(screen.getByText('19/09/2026. 03:31 PM')).toBeTruthy()
+})

@@ -10,6 +10,13 @@ import { formatTime, sessionSummary } from '../utils/stats'
 
 const sourceLabel = (source: string) => source === 'addons' ? 'Add-ons' : source.split('-').map(part => part[0].toUpperCase() + part.slice(1)).join(' ')
 
+function formatSessionDate(timestamp: number) {
+  const date = new Date(timestamp)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  const hour = date.getHours()
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}. ${pad(hour % 12 || 12)}:${pad(date.getMinutes())} ${hour < 12 ? 'AM' : 'PM'}`
+}
+
 function sessionTitle(session: StudySession) {
   const base = session.type === 'review' ? 'Review · ' + sourceLabel(session.source) : sourceLabel(session.source)
   if (session.type !== 'study') return base
@@ -56,7 +63,7 @@ export function HistoryPage() {
                   {session.shuffled && <Shuffle aria-label='Shuffled' />}
                   {session.timerMs != null && <Clock3 aria-label='Timer on' />}
                 </b>
-                <small>{new Date(session.finishedAt).toLocaleString()}</small>
+                <small>{formatSessionDate(session.finishedAt)}</small>
               </div>
               {session.type === 'study'
                 ? <><strong>{summary.correct} / {summary.total}</strong><span>{Math.round(summary.accuracy)}%</span><span>{summary.wrong} mistakes</span><span>{formatTime(summary.averageMs)} avg</span></>

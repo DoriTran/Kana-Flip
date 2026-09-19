@@ -358,6 +358,9 @@ button.setup-toggle-card:hover {
 .app-shell {
   max-width: 1200px;
 }
+.alphabet-toolbar {
+  margin-top: 34px;
+}
 .setup-columns {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
