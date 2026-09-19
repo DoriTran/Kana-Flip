@@ -311,6 +311,16 @@ button.setup-toggle-card:hover {
   margin: 0 auto;
   padding: 7px 12px;
 }
+.side-nav {
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.side-nav svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
 .setup-corner-art {
   position: absolute;
   bottom: 8px;
