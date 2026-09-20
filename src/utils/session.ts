@@ -10,9 +10,9 @@ export const studyTitle = (session: Pick<ActiveStudySession, 'source' | 'include
 
 export const shuffle = <T,>(items: T[]) => { const copy=[...items]; for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]]} return copy }
 export const createActiveSession = (ids: string[], preferences: StudyPreferences, source: StudySource, type: 'study'|'review'): ActiveStudySession => {
-  const deck = (preferences.shuffled ? shuffle(ids) : ids).map(kanaId=>({kanaId,graded:false,grade:null,recognitionMs:null}))
+  const deck = (preferences.shuffled ? shuffle(ids) : ids).map(kanaId=>({kanaId,graded:false,grade:null,recognitionMs:null,elapsedMs:0}))
   const waitingToStart = preferences.readyFirstCard
-  return { id: crypto.randomUUID(), type, source, startedAt: Date.now(), deck, currentIndex: 0, flipped: false, reviewQueue: [], reviewIndex: 0, reviewPhase: false, reviewTimings: {}, timerRemainingMs: preferences.timerMs, timerStartedAt: preferences.timerMs && !waitingToStart ? Date.now() : null, shuffled: preferences.shuffled, reviewMistakesAtEnd: preferences.reviewMistakesAtEnd, includeVoiced: preferences.includeVoiced, includeYoon: preferences.includeYoon, sessionTimerMs: preferences.timerMs, recordSession: preferences.recordSession, waitingToStart, completed: false }
+  return { id: crypto.randomUUID(), type, source, startedAt: Date.now(), deck, currentIndex: 0, flipped: false, phase: 'lesson', lessonHistory: [0], lessonCursor: 0, lessonFrontier: 0, lessonSkipped: [], reviewQueue: [], reviewIndex: 0, reviewHistory: [], reviewCursor: 0, reviewFrontier: 0, reviewSkipped: [], reviewPhase: false, reviewCompleted: [], reviewElapsedMs: {}, reviewTimings: {}, timerRemainingMs: preferences.timerMs, timerStartedAt: preferences.timerMs && !waitingToStart ? Date.now() : null, timerPaused: false, shuffled: preferences.shuffled, reviewMistakesAtEnd: preferences.reviewMistakesAtEnd, includeVoiced: preferences.includeVoiced, includeYoon: preferences.includeYoon, sessionTimerMs: preferences.timerMs, recordSession: preferences.recordSession, waitingToStart, completed: false }
 }
 export const archiveSession = (active: ActiveStudySession): StudySession => {
   const map = new Map<string,{correctCount:number;wrongCount:number;recognitionTimes:number[]}>()

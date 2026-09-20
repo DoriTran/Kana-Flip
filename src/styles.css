@@ -890,6 +890,12 @@ button.setup-toggle-card:hover {
   line-height: 1.4;
 }
 
+.progress-scores .score.skipped {
+  background: #fff1cf;
+  color: #8c611e;
+  border: 1px solid #f0d99f;
+}
+
 .learn-top > span {
   min-width: 0;
   overflow: hidden;

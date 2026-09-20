@@ -4,55 +4,58 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { kanaById } from '../data/kana'
 import { useKanaStore } from '../stores/kanaStore'
 import { archiveSession, studyTitle } from '../utils/session'
+import { currentAnswered, skipCount } from '../utils/studyFlow'
 import { formatTime, sessionSummary } from '../utils/stats'
 
 const isTextControl = (target: EventTarget | null) => target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable="true"]')
 
 export function LearningPage() {
   const nav = useNavigate(), store = useKanaStore(), active = store.activeSession
-  const [help, setHelp] = useState(false), [now, setNow] = useState(0)
+  const [help, setHelp] = useState(false), [now, setNow] = useState(() => Date.now())
   const [starNotice, setStarNotice] = useState<{ cardId: string; sequence: number } | null>(null)
   const starNoticeSequence = useRef(0)
   const shownAt = useRef(0)
   const handledExpiry = useRef<string | null>(null)
-  const cardId = active ? (active.reviewPhase ? active.reviewQueue[active.reviewIndex] : active.deck[active.currentIndex]?.kanaId) : null
-  const entry = active && !active.reviewPhase ? active.deck[active.currentIndex] : null
+  const cardId = active ? (active.phase === 'mistakes' ? active.reviewQueue[active.reviewIndex] : active.deck[active.currentIndex]?.kanaId) : null
+  const entry = active && active.phase !== 'mistakes' ? active.deck[active.currentIndex] : null
   const resetClock = useCallback(() => { shownAt.current = performance.now() }, [])
   const grade = useCallback((answer: 'correct' | 'wrong') => {
     const session = store.activeSession
     if (!session || session.completed) return
-    if (!session.reviewPhase && session.deck[session.currentIndex]?.graded) {
+    if (session.phase !== 'mistakes' && session.deck[session.currentIndex]?.graded) {
       if (store.preferences.allowRegrading) store.regrade(answer)
       return
     }
     store.grade(answer, Math.max(0, performance.now() - shownAt.current))
   }, [store])
 
-  useEffect(resetClock, [cardId, resetClock])
+  useEffect(resetClock, [cardId, active?.phase, active?.currentIndex, active?.reviewIndex, resetClock])
   useEffect(() => {
     if (!starNotice) return
     const timeout = window.setTimeout(() => setStarNotice(null), 1000)
     return () => window.clearTimeout(timeout)
   }, [starNotice])
   useEffect(() => {
-    if (!active?.timerStartedAt || active.timerRemainingMs == null || active.completed) return
+    if (active?.timerStartedAt == null || active.timerRemainingMs == null || active.completed) return
     const timer = window.setInterval(() => setNow(Date.now()), 100)
     return () => clearInterval(timer)
   }, [active?.timerStartedAt, active?.timerRemainingMs, active?.completed])
-  const remaining = active?.timerRemainingMs != null ? active.timerRemainingMs - (active.timerStartedAt ? now - active.timerStartedAt : 0) : null
+  const remaining = active?.timerRemainingMs != null ? Math.max(0,active.timerRemainingMs - (active.timerStartedAt == null ? 0 : Math.max(0,now - active.timerStartedAt))) : null
   useEffect(() => {
-    if (remaining == null || remaining > 0 || active?.completed) return
-    if (!active?.reviewPhase && entry?.graded) return
-    const expiryKey = `${active?.id}-${active?.reviewPhase ? `review-${active.reviewIndex}` : `main-${active?.currentIndex}`}-${active?.timerStartedAt}`
+    if (remaining == null || remaining > 0 || !active || active.completed || active.timerPaused || active.timerStartedAt == null || currentAnswered(active)) return
+    const expiryKey = `${active.id}-${active.phase}-${active.phase === 'mistakes' ? active.reviewIndex : active.currentIndex}-${active.timerStartedAt}`
     if (handledExpiry.current === expiryKey) return
     handledExpiry.current = expiryKey
     grade('wrong')
-  }, [remaining, active?.completed, active?.reviewPhase, active?.reviewIndex, active?.currentIndex, active?.id, active?.timerStartedAt, entry?.graded, grade])
+  }, [remaining, active, grade])
   useEffect(() => {
-    const visibility = () => { if (document.hidden) store.pauseTimer(); else { store.resumeTimer(); resetClock() } }
+    const visibility = () => { if (document.hidden) useKanaStore.getState().pauseTimer(); else { useKanaStore.getState().resumeTimer(); resetClock() } }
+    const pagehide = () => useKanaStore.getState().pauseTimer()
     document.addEventListener('visibilitychange', visibility)
-    return () => document.removeEventListener('visibilitychange', visibility)
-  }, [store, resetClock])
+    window.addEventListener('pagehide', pagehide)
+    if (!document.hidden) useKanaStore.getState().resumeTimer()
+    return () => { document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', pagehide); pagehide() }
+  }, [resetClock])
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTextControl(event.target) || help) return
@@ -64,8 +67,8 @@ export function LearningPage() {
         if (!useKanaStore.getState().kanaProgress[cardId]?.starred) store.toggleStar(cardId)
         setStarNotice({ cardId, sequence: ++starNoticeSequence.current })
       }
-      else if ((code === 'ArrowLeft' || code === 'KeyA') && !store.preferences.lockNavigation && store.preferences.timerMs == null) store.navigate(-1)
-      else if ((code === 'ArrowRight' || code === 'KeyD') && !store.preferences.lockNavigation && store.preferences.timerMs == null) store.navigate(1)
+      else if ((code === 'ArrowLeft' || code === 'KeyA') && !store.preferences.lockNavigation) store.navigate(-1)
+      else if ((code === 'ArrowRight' || code === 'KeyD') && !store.preferences.lockNavigation) store.navigate(1)
       else if (code === 'ArrowUp' || code === 'KeyW') grade('correct')
       else if (code === 'ArrowDown' || code === 'KeyS') grade('wrong')
     }
@@ -81,22 +84,27 @@ export function LearningPage() {
   const graded = active.deck.filter(item => item.graded)
   const correct = graded.filter(item => item.grade === 'correct').length
   const wrong = graded.filter(item => item.grade === 'wrong').length
-  const canGrade = active.reviewPhase || !entry?.graded || store.preferences.allowRegrading
-  const progress = active.reviewPhase ? active.reviewIndex / active.reviewQueue.length : graded.length / active.deck.length
-  const count = active.reviewPhase ? `${active.reviewIndex + 1} / ${active.reviewQueue.length}` : `${graded.length} / ${active.deck.length}`
+  const skipped = skipCount(active)
+  const canGrade = active.phase === 'mistakes' ? !currentAnswered(active) : !entry?.graded || store.preferences.allowRegrading
+  const completedInPhase = active.phase === 'mistakes' ? active.reviewCompleted.length : graded.length
+  const totalInPhase = active.phase === 'mistakes' ? active.reviewQueue.length : active.deck.length
+  const progress = totalInPhase ? completedInPhase / totalInPhase : 0
+  const count = `${completedInPhase} / ${totalInPhase}`
   const answer = kana.alphabet === 'katakana' ? kana.romaji[0].toUpperCase() + kana.romaji.slice(1) : kana.romaji
-  const navigationLocked = store.preferences.lockNavigation || store.preferences.timerMs != null
+  const navigationLocked = store.preferences.lockNavigation
+  const canNavigateBack = active.phase === 'mistakes' ? active.reviewCursor > 0 : active.lessonCursor > 0
+  const canNavigateNext = true
 
   return <div className={`learn-page ${store.preferences.reducedMotion ? 'reduced-motion' : ''}`}>
-    <header className="learn-top"><button onClick={() => nav('/')}><ArrowLeft /> Exit</button><span><b>{active.reviewPhase ? 'End Review' : active.type === 'review' ? 'Review · ' + active.source.replace('-', ' ') : studyTitle(active)}</b></span><div><button className="icon-button" onClick={() => setHelp(true)} aria-label="Keyboard shortcuts"><HelpCircle /></button></div></header>
-    <div className="progress-wrap"><div className="progress-rail"><i style={{ width: `${progress * 100}%` }} /></div><div className="progress-meta"><b>{count}</b><div className="progress-scores"><span className="score good">✓ {correct}</span><span className="score bad">× {wrong}</span></div></div></div>
-    {active.reviewPhase && <p className="review-label"><RotateCcw /> Review · {active.reviewQueue.length - active.reviewIndex} cards to revisit</p>}
+    <header className="learn-top"><button onClick={() => nav('/')}><ArrowLeft /> Exit</button><span><b>{active.phase === 'mistakes' ? 'Review mistakes' : active.type === 'review' ? 'Review · ' + active.source.replace('-', ' ') : studyTitle(active)}</b></span><div><button className="icon-button" onClick={() => setHelp(true)} aria-label="Keyboard shortcuts"><HelpCircle /></button></div></header>
+    <div className="progress-wrap"><div className="progress-rail"><i style={{ width: `${progress * 100}%` }} /></div><div className="progress-meta"><b>{count}</b><div className="progress-scores">{skipped > 0 && <span className="score skipped" aria-label={`${skipped} skipped cards`}>↷ {skipped}</span>}<span className="score good">✓ {correct}</span><span className="score bad">× {wrong}</span></div></div></div>
+    {active.phase === 'mistakes' && <p className="review-label"><RotateCcw /> Review · {active.reviewQueue.length - active.reviewCompleted.length} cards to revisit</p>}
     <main className={`study-stage ${navigationLocked ? 'locked' : ''}`}>
-      {!navigationLocked && <button className="side-nav" onClick={() => store.navigate(-1)} disabled={active.reviewPhase || active.currentIndex === 0}><ArrowLeft /></button>}
-      <div className="card-area"><button className={`flip-scene ${active.flipped ? 'is-flipped' : ''}`} onClick={store.flip} aria-label={`Flip card showing ${kana.character}`}><span key={`${active.reviewPhase ? 'review' : 'main'}-${active.reviewPhase ? active.reviewIndex : active.currentIndex}-${cardId}`} className="flip-card"><span className="card-face card-front"><span className="big-kana">{kana.character}</span></span><span className="card-face card-back"><strong className="big-romaji">{answer}</strong></span></span></button><p>Click or press Space to flip <span aria-hidden>↝</span></p>{remaining != null && <div key={`timer-${active.reviewPhase ? `review-${active.reviewIndex}` : `main-${active.currentIndex}`}-${cardId}`} className="timer-bar"><i style={{ width: `${Math.min(100, Math.max(0, remaining) / (store.preferences.timerMs ?? 1) * 100)}%` }} /></div>}</div>
-      {!navigationLocked && <button className="side-nav" onClick={() => store.navigate(1)} disabled={active.reviewPhase || active.currentIndex === active.deck.length - 1}><ArrowRight /></button>}
+      {!navigationLocked && <button className="side-nav" onClick={() => store.navigate(-1)} disabled={!canNavigateBack}><ArrowLeft /></button>}
+      <div className="card-area"><button className={`flip-scene ${active.flipped ? 'is-flipped' : ''}`} onClick={store.flip} aria-label={`Flip card showing ${kana.character}`}><span key={`${active.reviewPhase ? 'review' : 'main'}-${active.reviewPhase ? active.reviewIndex : active.currentIndex}-${cardId}`} className="flip-card"><span className="card-face card-front"><span className="big-kana">{kana.character}</span></span><span className="card-face card-back"><strong className="big-romaji">{answer}</strong></span></span></button><p>Click or press Space to flip <span aria-hidden>↝</span></p>{remaining != null && <div key={`timer-${active.reviewPhase ? `review-${active.reviewIndex}` : `main-${active.currentIndex}`}-${cardId}`} className="timer-bar"><i style={{ width: `${Math.min(100, Math.max(0, remaining) / (active.sessionTimerMs ?? 1) * 100)}%` }} /></div>}</div>
+      {!navigationLocked && <button className="side-nav" onClick={() => store.navigate(1)} disabled={!canNavigateNext}><ArrowRight /></button>}
     </main>
-    <footer className="study-controls">{!navigationLocked && <button onClick={() => store.navigate(-1)} disabled={active.reviewPhase || active.currentIndex === 0}><ArrowLeft /> Previous</button>}<button className="wrong" disabled={!canGrade} onClick={() => grade('wrong')}><X /> Wrong</button><div className="flip-action">{starNotice?.cardId === cardId && <span key={starNotice.sequence} className="star-feedback" role="status"><Star /> Star <Star /></span>}<button className="flip-control" onClick={store.flip}><RotateCcw /> Flip</button></div><button className="correct" disabled={!canGrade} onClick={() => grade('correct')}><Check /> Got it</button>{!navigationLocked && <button onClick={() => store.navigate(1)} disabled={active.reviewPhase || active.currentIndex === active.deck.length - 1}>Next <ArrowRight /></button>}</footer>
+    <footer className="study-controls">{!navigationLocked && <button onClick={() => store.navigate(-1)} disabled={!canNavigateBack}><ArrowLeft /> Previous</button>}<button className="wrong" disabled={!canGrade} onClick={() => grade('wrong')}><X /> Wrong</button><div className="flip-action">{starNotice?.cardId === cardId && <span key={starNotice.sequence} className="star-feedback" role="status"><Star /> Star <Star /></span>}<button className="flip-control" onClick={store.flip}><RotateCcw /> Flip</button></div><button className="correct" disabled={!canGrade} onClick={() => grade('correct')}><Check /> Got it</button>{!navigationLocked && <button onClick={() => store.navigate(1)} disabled={!canNavigateNext}>Next <ArrowRight /></button>}</footer>
     {store.preferences.showKeyboardHints && <div className="keyboard-strip">{!navigationLocked && <span>A / ←</span>}<span>S / ↓</span><span>Space</span><span>W / ↑</span>{!navigationLocked && <span>D / →</span>}</div>}
     {help && <KeyboardHelp onClose={() => setHelp(false)} />}
   </div>
