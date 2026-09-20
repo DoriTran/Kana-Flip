@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpDown, Check, Clock3, Flower, X } from 'lucide-react'
+import { ArrowLeft, ArrowUpDown, Check, Clock3, Flower, Star, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Layout } from '../components/Layout'
@@ -17,6 +17,8 @@ export function LessonReviewPage() {
   const storedSession = useKanaStore(state => state.sessions.find(item => item.id === sessionId))
   const activeSession = useKanaStore(state => state.activeSession)
   const archiveActive = useKanaStore(state => state.archiveActive)
+  const kanaProgress = useKanaStore(state => state.kanaProgress)
+  const toggleStar = useKanaStore(state => state.toggleStar)
   const [activeSnapshot] = useState(() => {
     if (!activeSession || activeSession.id !== sessionId || !activeSession.completed) return null
     return archiveSession(activeSession)
@@ -86,6 +88,7 @@ export function LessonReviewPage() {
       <div className="review-lesson-grid">
         {cards.map(({ kanaId, kana, correct, time }, index) =>
           <article className={'lesson-kana-card ' + (correct ? 'was-correct' : 'was-wrong')} key={kanaId + '-' + index}>
+            <button className={'star-button ' + (kanaProgress[kanaId]?.starred ? 'starred' : '')} onClick={() => toggleStar(kanaId)} aria-label={kanaProgress[kanaId]?.starred ? 'Unstar kana' : 'Star kana'} aria-pressed={!!kanaProgress[kanaId]?.starred}><Star /></button>
             <span className="lesson-number">{index + 1}</span>
             <span className="kana-char">{kana.character}</span>
             <b>{kana.alphabet === 'katakana' ? kana.romaji[0].toUpperCase() + kana.romaji.slice(1) : kana.romaji}</b>

@@ -17,9 +17,9 @@ function formatSessionDate(timestamp: number) {
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}. ${pad(hour % 12 || 12)}:${pad(date.getMinutes())} ${hour < 12 ? 'AM' : 'PM'}`
 }
 
-function sessionTitle(session: StudySession) {
-  const base = session.type === 'review' ? 'Review · ' + sourceLabel(session.source) : sourceLabel(session.source)
-  if (session.type !== 'study') return base
+function sessionTitle(session: StudySession, cardCount: number) {
+  const base = sourceLabel(session.source)
+  if (session.type === 'review') return base + ' · ' + cardCount + ' cards'
   const { includeVoiced, includeYoon } = sessionAddons(session)
   const addons = [includeVoiced && 'Voiced', includeYoon && 'Yōon'].filter(Boolean).join(' + ')
   if (session.source === 'addons') return addons || base
@@ -54,20 +54,21 @@ export function HistoryPage() {
           : sessions.map(session => {
             const summary = sessionSummary(session)
             const kana = sessionKana(session)
-            return <article key={session.id} className={session.type === 'review' ? 'review-row' : ''}>
+            return <article key={session.id}>
               <span className={'history-kana' + (session.source === 'addons' ? ' addon-kana' : '') + (kana && kana.length > 1 ? ' both-kana' : '')}>{kana ?? <BookOpenCheck aria-label='Review' />}</span>
               <div>
                 <b className='session-title-row'>
-                  <span>{sessionTitle(session)}</span>
+                  <span>{sessionTitle(session, summary.total)}</span>
                   {session.reviewMistakesAtEnd && <RotateCcw aria-label='Review mistakes at end' />}
                   {session.shuffled && <Shuffle aria-label='Shuffled' />}
                   {session.timerMs != null && <Clock3 aria-label='Timer on' />}
                 </b>
                 <small>{formatSessionDate(session.finishedAt)}</small>
               </div>
-              {session.type === 'study'
-                ? <><strong>{summary.correct} / {summary.total}</strong><span>{Math.round(summary.accuracy)}%</span><span>{summary.wrong} mistakes</span><span>{formatTime(summary.averageMs)} avg</span></>
-                : <span className='review-count'>{summary.total} cards</span>}
+              <strong>{summary.correct} / {summary.total}</strong>
+              <span>{Math.round(summary.accuracy)}%</span>
+              <span>{summary.wrong} mistakes</span>
+              <span>{formatTime(summary.averageMs)} avg</span>
               <div className='history-actions'>
                 <button className='history-review' onClick={() => nav('/review/' + session.id)} aria-label={'Review ' + session.source + ' lesson'}><BookOpenCheck /> Review</button>
                 <button className='history-delete' onClick={() => setDeleting(session.id)} aria-label={'Delete ' + session.source + ' record'}><Trash2 /></button>
