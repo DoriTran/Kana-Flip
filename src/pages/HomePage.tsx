@@ -235,17 +235,17 @@ export function HomePage() {
           <div className="setup-divider" />
           <div className="setup-panel-heading"><Settings2 /><div><h3>Settings</h3><p>Session preferences</p></div></div>
           <div className="setup-toggle-list">
-            <button className={'setup-toggle-card' + (!p.recordSession ? ' is-on' : '')} onClick={() => setPreferences({ recordSession: !p.recordSession })} aria-pressed={!p.recordSession}>
-              <EyeOff /><span><strong>Not record</strong><small>Practice mode (don’t save results)</small></span><i className="setup-switch" aria-hidden />
-            </button>
             <button className={'setup-toggle-card' + (p.readyFirstCard ? ' is-on' : '')} onClick={() => setPreferences({ readyFirstCard: !p.readyFirstCard })} aria-pressed={p.readyFirstCard}>
               <Sparkles /><span><strong>Ready first card</strong><small>Show a ready screen before the first card</small></span><i className="setup-switch" aria-hidden />
             </button>
-            <button className={'setup-toggle-card' + (p.lockNavigation ? ' is-on' : '')} onClick={() => setPreferences({ lockNavigation: !p.lockNavigation })} aria-pressed={p.lockNavigation}>
-              <LockKeyhole /><span><strong>Lock back &amp; forth</strong><small>Hide Previous and Next navigation</small></span><i className="setup-switch" aria-hidden />
-            </button>
             <button className={'setup-toggle-card' + (p.allowRegrading ? ' is-on' : '')} onClick={() => setPreferences({ allowRegrading: !p.allowRegrading })} aria-pressed={p.allowRegrading}>
               <RotateCcw /><span><strong>Change answers</strong><small>Change Wrong or Correct on answered cards</small></span><i className='setup-switch' aria-hidden />
+            </button>
+            <button className={'setup-toggle-card' + (p.lockNavigation ? ' is-on' : '')} onClick={() => setPreferences({ lockNavigation: !p.lockNavigation })} aria-pressed={p.lockNavigation}>
+              <LockKeyhole /><span><strong>Lock navigation</strong><small>Hide Previous and Next navigation</small></span><i className="setup-switch" aria-hidden />
+            </button>
+            <button className={'setup-toggle-card' + (!p.recordSession ? ' is-on' : '')} onClick={() => setPreferences({ recordSession: !p.recordSession })} aria-pressed={!p.recordSession}>
+              <EyeOff /><span><strong>Not record</strong><small>Practice mode (don’t save results)</small></span><i className="setup-switch" aria-hidden />
             </button>
           </div>
         </section>
