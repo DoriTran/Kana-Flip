@@ -321,6 +321,46 @@ button.setup-toggle-card:hover {
   width: 20px;
   height: 20px;
 }
+.flip-action {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.flip-action .flip-control {
+  width: 100%;
+}
+.star-feedback {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 7px);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #a77932;
+  font-size: 1rem;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: star-fade-up 0.6s ease-out both;
+}
+.star-feedback svg {
+  width: 14px;
+  height: 14px;
+  color: #d5ad64;
+  fill: #ebca87;
+}
+.star-button.starred,
+.tabs button svg {
+  color: #d5ad64;
+}
+.star-button.starred svg,
+.tabs button svg {
+  fill: #ebca87;
+}
+@keyframes star-fade-up {
+  0% { opacity: 0; transform: translate(-50%, 2px); }
+  50%, 100% { opacity: 1; transform: translate(-50%, -3.6px); }
+}
 .setup-corner-art {
   position: absolute;
   bottom: 8px;

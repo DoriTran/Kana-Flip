@@ -11,6 +11,8 @@ const isTextControl = (target: EventTarget | null) => target instanceof HTMLElem
 export function LearningPage() {
   const nav = useNavigate(), store = useKanaStore(), active = store.activeSession
   const [help, setHelp] = useState(false), [now, setNow] = useState(0)
+  const [starNotice, setStarNotice] = useState<{ cardId: string; sequence: number } | null>(null)
+  const starNoticeSequence = useRef(0)
   const shownAt = useRef(0)
   const handledExpiry = useRef<string | null>(null)
   const cardId = active ? (active.reviewPhase ? active.reviewQueue[active.reviewIndex] : active.deck[active.currentIndex]?.kanaId) : null
@@ -27,6 +29,11 @@ export function LearningPage() {
   }, [store])
 
   useEffect(resetClock, [cardId, resetClock])
+  useEffect(() => {
+    if (!starNotice) return
+    const timeout = window.setTimeout(() => setStarNotice(null), 1000)
+    return () => window.clearTimeout(timeout)
+  }, [starNotice])
   useEffect(() => {
     if (!active?.timerStartedAt || active.timerRemainingMs == null || active.completed) return
     const timer = window.setInterval(() => setNow(Date.now()), 100)
@@ -51,9 +58,12 @@ export function LearningPage() {
       if (isTextControl(event.target) || help) return
       if (store.activeSession?.waitingToStart) { event.preventDefault(); store.beginSession(); resetClock(); return }
       const code = event.code
-      if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyW', 'KeyS', 'Enter'].includes(code)) event.preventDefault()
+      if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyE', 'Enter'].includes(code)) event.preventDefault()
       if (code === 'Space') store.flip()
-      else if (code === 'Enter' && cardId) store.toggleStar(cardId)
+      else if ((code === 'Enter' || code === 'KeyE') && cardId) {
+        if (!useKanaStore.getState().kanaProgress[cardId]?.starred) store.toggleStar(cardId)
+        setStarNotice({ cardId, sequence: ++starNoticeSequence.current })
+      }
       else if ((code === 'ArrowLeft' || code === 'KeyA') && !store.preferences.lockNavigation && store.preferences.timerMs == null) store.navigate(-1)
       else if ((code === 'ArrowRight' || code === 'KeyD') && !store.preferences.lockNavigation && store.preferences.timerMs == null) store.navigate(1)
       else if (code === 'ArrowUp' || code === 'KeyW') grade('correct')
@@ -86,13 +96,13 @@ export function LearningPage() {
       <div className="card-area"><button className={`flip-scene ${active.flipped ? 'is-flipped' : ''}`} onClick={store.flip} aria-label={`Flip card showing ${kana.character}`}><span key={`${active.reviewPhase ? 'review' : 'main'}-${active.reviewPhase ? active.reviewIndex : active.currentIndex}-${cardId}`} className="flip-card"><span className="card-face card-front"><span className="big-kana">{kana.character}</span></span><span className="card-face card-back"><strong className="big-romaji">{answer}</strong></span></span></button><p>Click or press Space to flip <span aria-hidden>↝</span></p>{remaining != null && <div key={`timer-${active.reviewPhase ? `review-${active.reviewIndex}` : `main-${active.currentIndex}`}-${cardId}`} className="timer-bar"><i style={{ width: `${Math.min(100, Math.max(0, remaining) / (store.preferences.timerMs ?? 1) * 100)}%` }} /></div>}</div>
       {!navigationLocked && <button className="side-nav" onClick={() => store.navigate(1)} disabled={active.reviewPhase || active.currentIndex === active.deck.length - 1}><ArrowRight /></button>}
     </main>
-    <footer className="study-controls">{!navigationLocked && <button onClick={() => store.navigate(-1)} disabled={active.reviewPhase || active.currentIndex === 0}><ArrowLeft /> Previous</button>}<button className="wrong" disabled={!canGrade} onClick={() => grade('wrong')}><X /> Wrong</button><button className="flip-control" onClick={store.flip}><RotateCcw /> Flip</button><button className="correct" disabled={!canGrade} onClick={() => grade('correct')}><Check /> Got it</button>{!navigationLocked && <button onClick={() => store.navigate(1)} disabled={active.reviewPhase || active.currentIndex === active.deck.length - 1}>Next <ArrowRight /></button>}</footer>
+    <footer className="study-controls">{!navigationLocked && <button onClick={() => store.navigate(-1)} disabled={active.reviewPhase || active.currentIndex === 0}><ArrowLeft /> Previous</button>}<button className="wrong" disabled={!canGrade} onClick={() => grade('wrong')}><X /> Wrong</button><div className="flip-action">{starNotice?.cardId === cardId && <span key={starNotice.sequence} className="star-feedback" role="status"><Star /> Star <Star /></span>}<button className="flip-control" onClick={store.flip}><RotateCcw /> Flip</button></div><button className="correct" disabled={!canGrade} onClick={() => grade('correct')}><Check /> Got it</button>{!navigationLocked && <button onClick={() => store.navigate(1)} disabled={active.reviewPhase || active.currentIndex === active.deck.length - 1}>Next <ArrowRight /></button>}</footer>
     {store.preferences.showKeyboardHints && <div className="keyboard-strip">{!navigationLocked && <span>A / ←</span>}<span>S / ↓</span><span>Space</span><span>W / ↑</span>{!navigationLocked && <span>D / →</span>}</div>}
     {help && <KeyboardHelp onClose={() => setHelp(false)} />}
   </div>
 }
 
-function KeyboardHelp({ onClose }: { onClose: () => void }) { return <div className="modal-backdrop"><div className="dialog keyboard-help" role="dialog" aria-modal="true"><div className="dialog-title"><h2>Keyboard shortcuts</h2><button className="icon-button" onClick={onClose}><X /></button></div><dl><dt>Space</dt><dd>Flip card</dd><dt>W / ↑</dt><dd>Correct</dd><dt>S / ↓</dt><dd>Wrong</dd><dt>A / ←</dt><dd>Previous</dd><dt>D / →</dt><dd>Next</dd><dt>Enter</dt><dd>Star / unstar</dd></dl></div></div> }
+function KeyboardHelp({ onClose }: { onClose: () => void }) { return <div className="modal-backdrop"><div className="dialog keyboard-help" role="dialog" aria-modal="true"><div className="dialog-title"><h2>Keyboard shortcuts</h2><button className="icon-button" onClick={onClose}><X /></button></div><dl><dt>Space</dt><dd>Flip card</dd><dt>W / ↑</dt><dd>Correct</dd><dt>S / ↓</dt><dd>Wrong</dd><dt>A / ←</dt><dd>Previous</dd><dt>D / →</dt><dd>Next</dd><dt>E / Enter</dt><dd>Star card (unstar in Alphabet)</dd></dl></div></div> }
 function ResultView() {
   const nav = useNavigate(), store = useKanaStore(), active = store.activeSession!
   const snapshot = archiveSession(active)
