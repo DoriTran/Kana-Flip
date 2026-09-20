@@ -6,6 +6,7 @@ import { useKanaStore } from '../stores/kanaStore'
 import { archiveSession, studyTitle } from '../utils/session'
 import { currentAnswered, skipCount } from '../utils/studyFlow'
 import { formatTime, sessionSummary } from '../utils/stats'
+import { canUsePageShortcut } from '../utils/pageShortcut'
 
 const isTextControl = (target: EventTarget | null) => target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable="true"]')
 
@@ -58,7 +59,7 @@ export function LearningPage() {
   }, [resetClock])
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isTextControl(event.target) || help) return
+      if (isTextControl(event.target) || help || store.activeSession?.completed) return
       if (store.activeSession?.waitingToStart) { event.preventDefault(); store.beginSession(); resetClock(); return }
       const code = event.code
       if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyE', 'Enter'].includes(code)) event.preventDefault()
@@ -116,5 +117,20 @@ function ResultView() {
   const snapshot = archiveSession(active)
   const sum = sessionSummary(snapshot)
   const reviewLesson = () => nav(`/review/${active.id}`)
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!canUsePageShortcut(event)) return
+      if (event.code === 'Space') {
+        event.preventDefault()
+        store.archiveActive()
+        nav('/')
+      } else if (event.code === 'Enter') {
+        event.preventDefault()
+        reviewLesson()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
   return <div className="result-page"><div className="confetti">✿ · ⋆ · ❀</div><h1>Session Complete!</h1><p>Great work today! ♡</p><section className="result-card"><div className="result-primary"><span><strong>{sum.correct} / {sum.total}</strong>Correct</span><span><strong>{sum.accuracy.toFixed(1)}%</strong>Accuracy</span><span><strong>{sum.wrong}</strong>Mistakes</span></div><div className="result-times"><span><strong>{formatTime(sum.averageMs)}</strong>Average time</span><span><strong>{sum.fastest ? formatTime(sum.fastest.ms) : '—'}</strong>Fastest</span><span><strong>{sum.slowest ? formatTime(sum.slowest.ms) : '—'}</strong>Slowest</span></div></section><button className="primary result-action" onClick={reviewLesson}><BookOpenCheck /> Review lesson</button><button className="home-action" onClick={() => { store.archiveActive(); nav('/') }}><House /> Back to Home</button></div>
 }

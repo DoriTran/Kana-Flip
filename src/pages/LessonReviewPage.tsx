@@ -6,6 +6,7 @@ import { kanaById } from '../data/kana'
 import { useKanaStore } from '../stores/kanaStore'
 import { archiveSession, sessionAddons } from '../utils/session'
 import { formatTime, sessionSummary } from '../utils/stats'
+import { canUsePageShortcut } from '../utils/pageShortcut'
 
 type SortMode = 'wrong-slowest' | 'correct-fastest'
 
@@ -25,6 +26,16 @@ export function LessonReviewPage() {
   useEffect(() => {
     if (!storedSession && activeSnapshot) archiveActive()
   }, [storedSession, activeSnapshot, archiveActive])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' || !canUsePageShortcut(event)) return
+      event.preventDefault()
+      nav('/')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [nav])
 
   if (!session) return <Navigate to="/" replace />
 

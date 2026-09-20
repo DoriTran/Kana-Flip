@@ -9,6 +9,7 @@ import { Layout } from '../components/Layout'
 import { SettingsDialog } from '../components/SettingsDialog'
 import { useKanaStore } from '../stores/kanaStore'
 import { sourceIds } from '../utils/session'
+import { canUsePageShortcut } from '../utils/pageShortcut'
 import { recentWrongCount, slowReviewIds } from '../utils/stats'
 
 export function HomePage() {
@@ -41,6 +42,16 @@ export function HomePage() {
   }, [activeSession?.id, activeSession?.completed])
 
   const start = () => { if (store.startSession()) nav('/learn') }
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' || !canUsePageShortcut(event) || settings || discard || empty) return
+      event.preventDefault()
+      if (activeSession && !activeSession.completed) nav('/learn')
+      else if (!activeSession) start()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
   const toggleTimer = () => setPreferences({ timerMs: p.timerMs == null ? 5000 : null })
   const setTimerSeconds = (value: string) => {
     const seconds = Math.max(1, Math.min(60, Number(value) || 1))
